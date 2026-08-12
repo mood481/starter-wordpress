@@ -1,0 +1,16 @@
+# Environment values and secrets
+.env
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.sublime*
+
+# Build
+build/
+
+# Local scratch
+*.tmp
+*.log
+

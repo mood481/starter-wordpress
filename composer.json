@@ -1,0 +1,44 @@
+{
+  "name": "mood/starter-wordpress",
+  "type": "project",
+  "license": "proprietary",
+  "repositories": [
+    {
+      "name": "wp-packages",
+      "type": "composer",
+      "url": "https://repo.wp-packages.org"
+    }
+  ],
+  "require": {
+    "php": "^8.3",
+    "composer/installers": "^2.0",
+    "roots/wordpress": "^7.0",
+    "vlucas/phpdotenv": "^5.0"
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/installers": true,
+      "roots/wordpress-core-installer": true
+    },
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "platform": {
+      "php": "8.3.0"
+    }
+  },
+  "extra": {
+    "wordpress-install-dir": "build/public/wp",
+    "installer-paths": {
+      "build/public/wp-content/mu-plugins/{$name}/": [
+        "type:wordpress-muplugin"
+      ],
+      "build/public/wp-content/plugins/{$name}/": [
+        "type:wordpress-plugin"
+      ],
+      "build/public/wp-content/themes/{$name}/": [
+        "type:wordpress-theme"
+      ]
+    }
+  }
+}

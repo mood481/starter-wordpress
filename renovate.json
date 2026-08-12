@@ -1,0 +1,12 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "enabledManagers": [
+    "composer"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "at any time"
+    ]
+  }
+}
