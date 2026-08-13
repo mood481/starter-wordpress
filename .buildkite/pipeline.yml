@@ -1,0 +1,10 @@
+steps:
+  - label: ":wordpress: Build & smoke"
+    command:
+      - "./ops/test"
+      - "./ops/smoke"
+    timeout_in_minutes: 10
+    agents:
+      queue: "test"
+    checkout:
+      ssh_secret: "GITEA_SSH_KEY"
