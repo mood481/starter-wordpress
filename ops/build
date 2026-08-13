@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUILD_DIR="$ROOT/build"
+PUBLIC_DIR="$BUILD_DIR/public"
+
+cd "$ROOT"
+
+echo "==> Cleaning build directory"
+rm -rf "$BUILD_DIR"
+
+echo "==> Installing application dependencies"
+
+if command -v composer >/dev/null 2>&1; then
+    COMPOSER=(composer)
+else
+    COMPOSER=("$ROOT/ops/local/composer")
+fi
+
+"${COMPOSER[@]}" install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader
+
+echo "==> Preparing application structure"
+
+mkdir -p \
+    "$PUBLIC_DIR/wp-content/mu-plugins" \
+    "$PUBLIC_DIR/wp-content/plugins" \
+    "$PUBLIC_DIR/wp-content/themes"
+
+cp "$ROOT/bootstrap/index.php" \
+   "$PUBLIC_DIR/index.php"
+
+cp "$ROOT/bootstrap/wp-config.php" \
+   "$PUBLIC_DIR/wp-config.php"
+
+cp -a "$ROOT/config" \
+      "$BUILD_DIR/config"
+
+copy_source_tree() {
+    local source="$1"
+    local destination="$2"
+
+    [[ -d "$source" ]] || return 0
+
+    while IFS= read -r -d '' entry; do
+        local name
+        name="$(basename "$entry")"
+
+        # Allows empty source directories to be tracked in Git.
+        [[ "$name" == ".gitkeep" ]] && continue
+
+        if [[ -e "$destination/$name" ]]; then
+            echo "Build collision: $destination/$name already exists" >&2
+            exit 1
+        fi
+
+        cp -a "$entry" "$destination/"
+    done < <(
+        find "$source" \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -print0
+    )
+}
+
+echo "==> Adding project-managed WordPress code"
+
+copy_source_tree \
+    "$ROOT/src/mu-plugins" \
+    "$PUBLIC_DIR/wp-content/mu-plugins"
+
+copy_source_tree \
+    "$ROOT/src/plugins" \
+    "$PUBLIC_DIR/wp-content/plugins"
+
+copy_source_tree \
+    "$ROOT/src/themes" \
+    "$PUBLIC_DIR/wp-content/themes"
+
+echo "==> Build complete"
+echo
+echo "Artifact:"
+echo "  $BUILD_DIR"
+echo
+echo "Document root:"
+echo "  $PUBLIC_DIR"

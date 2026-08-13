@@ -1,0 +1,70 @@
+x-wordpress-env: &wordpress-env
+  WP_ENVIRONMENT_TYPE: development
+
+  WP_HOME: http://127.0.0.1:${SMOKE_PORT:-8080}
+  WP_SITEURL: http://127.0.0.1:${SMOKE_PORT:-8080}/wp
+
+  DB_NAME: wordpress
+  DB_USER: wordpress
+  DB_PASSWORD: wordpress
+  DB_HOST: db
+  DB_CHARSET: utf8mb4
+  DB_COLLATE: ""
+  DB_TABLE_PREFIX: wp_
+
+  AUTH_KEY: smoke-auth-key
+  SECURE_AUTH_KEY: smoke-secure-auth-key
+  LOGGED_IN_KEY: smoke-logged-in-key
+  NONCE_KEY: smoke-nonce-key
+  AUTH_SALT: smoke-auth-salt
+  SECURE_AUTH_SALT: smoke-secure-auth-salt
+  LOGGED_IN_SALT: smoke-logged-in-salt
+  NONCE_SALT: smoke-nonce-salt
+
+services:
+  db:
+    image: mariadb:11.8.8
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - --connect
+        - --innodb_initialized
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: ../..
+      dockerfile: ops/docker/smoke.Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: *wordpress-env
+    ports:
+      - "127.0.0.1:${SMOKE_PORT:-8080}:80"
+    volumes:
+      - ../../build/public:/var/www/html
+      - ../../build/vendor:/var/www/vendor:ro
+      - ../../build/config:/var/www/config:ro
+
+  cli:
+    image: wordpress:cli-php8.3
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: *wordpress-env
+    working_dir: /var/www/html/wp
+    volumes:
+      - ../../build/public:/var/www/html
+      - ../../build/vendor:/var/www/vendor:ro
+      - ../../build/config:/var/www/config:ro
+    entrypoint:
+      - wp
