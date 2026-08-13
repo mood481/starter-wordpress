@@ -3,6 +3,8 @@
   "enabledManagers": [
     "composer"
   ],
+  "rangeStrategy": "update-lockfile",
+  "updatePinnedDependencies": false,
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": [
