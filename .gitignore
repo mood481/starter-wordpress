@@ -1,5 +1,6 @@
 # Environment values and secrets
 .env
+.env.*.local
 
 # Editor / OS
 .DS_Store
@@ -9,6 +10,7 @@
 
 # Build
 build/
+vendor/
 
 # Local scratch
 *.tmp

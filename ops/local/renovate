@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ENV_FILE="${RENOVATE_ENV_FILE:-$ROOT/.env.renovate.local}"
+RENOVATE_IMAGE="${RENOVATE_IMAGE:-renovate/renovate:44.27.0}"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Missing Renovate environment file: $ENV_FILE" >&2
+  echo "Copy .env.renovate.example to .env.renovate.local first." >&2
+  exit 1
+fi
+
+MODE="${1:-run}"
+
+DOCKER_ARGS=(
+  --rm
+  --env-file "$ENV_FILE"
+)
+
+if [[ -n "${LOG_LEVEL:-}" ]]; then
+  DOCKER_ARGS+=(--env "LOG_LEVEL=$LOG_LEVEL")
+fi
+
+case "$MODE" in
+  run)
+    ;;
+  dry-run)
+    DOCKER_ARGS+=(--env RENOVATE_DRY_RUN=full)
+    ;;
+  *)
+    echo "Usage: $0 [run|dry-run]" >&2
+    exit 1
+    ;;
+esac
+
+exec docker run "${DOCKER_ARGS[@]}" "$RENOVATE_IMAGE"

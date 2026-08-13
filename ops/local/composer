@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+COMPOSER_IMAGE="${COMPOSER_IMAGE:-composer:2.10.2}"
+
+DOCKER_ARGS=(
+  --rm
+  --volume "$ROOT:/app"
+  --workdir /app
+  --env COMPOSER_ALLOW_SUPERUSER=1
+)
+
+# Evita ficheros propiedad de root en Linux.
+if [[ "$(uname -s)" == "Linux" ]]; then
+  DOCKER_ARGS+=(
+    --user "$(id -u):$(id -g)"
+    --env HOME=/tmp
+  )
+fi
+
+exec docker run "${DOCKER_ARGS[@]}" "$COMPOSER_IMAGE" "$@"

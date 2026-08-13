@@ -7,8 +7,44 @@
   "updatePinnedDependencies": false,
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": [
-      "at any time"
-    ]
-  }
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "description": "Automerge non-major stable dependency updates",
+      "matchManagers": [
+        "composer"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
+    },
+    {
+      "description": "Never automerge major dependency updates",
+      "matchManagers": [
+        "composer"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Require manual approval for WordPress feature releases",
+      "matchManagers": [
+        "composer"
+      ],
+      "matchPackageNames": [
+        "roots/wordpress"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "automerge": false
+    }
+  ]
 }
