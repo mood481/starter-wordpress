@@ -3,6 +3,10 @@ steps:
     command:
       - "./ops/test"
       - "./ops/smoke"
+
+    plugins:
+      - ssh://git@git.mood481.es:2207/mood/buildkite-plugins.git/gitea-status#v0.1.0: ~
+
     timeout_in_minutes: 10
     agents:
       queue: "test"
