@@ -1,15 +1,16 @@
 steps:
-  - label: ":wordpress: Build & smoke"
-    key: "build-smoke"
+  - label: ":wordpress: Build, smoke & package"
+    key: "release"
     command:
       - "./ops/test"
       - "./ops/smoke"
+      - "./ops/package"
+      - 'buildkite-agent artifact upload "dist/*"'
     timeout_in_minutes: 10
     checkout:
       ssh_secret: "GITEA_SSH_KEY"
 
   - label: ":shield: Dependency audit"
-    depends_on: "build-smoke"
     command:
       - "./ops/audit"
     timeout_in_minutes: 5

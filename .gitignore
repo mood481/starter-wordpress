@@ -11,6 +11,7 @@
 # Build
 build/
 vendor/
+dist/
 
 # Local scratch
 *.tmp

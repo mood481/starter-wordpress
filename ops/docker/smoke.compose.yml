@@ -51,7 +51,7 @@ services:
     ports:
       - "127.0.0.1:${SMOKE_PORT:-8080}:80"
     volumes:
-      - ../../build/public:/var/www/html
+      - ../../build/public:/var/www/html:ro
       - ../../build/vendor:/var/www/vendor:ro
       - ../../build/config:/var/www/config:ro
 
@@ -63,7 +63,7 @@ services:
     environment: *wordpress-env
     working_dir: /var/www/html/wp
     volumes:
-      - ../../build/public:/var/www/html
+      - ../../build/public:/var/www/html:ro
       - ../../build/vendor:/var/www/vendor:ro
       - ../../build/config:/var/www/config:ro
     entrypoint:

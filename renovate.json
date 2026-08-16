@@ -16,7 +16,7 @@
                 "patch"
             ],
             "matchCurrentVersion": "!/^0/",
-            "automerge": true
+            "automerge": false
         },
         {
             "description": "Never automerge major dependency updates",
