@@ -1,14 +1,18 @@
 steps:
   - label: ":wordpress: Build & smoke"
+    key: "build-smoke"
     command:
       - "./ops/test"
       - "./ops/smoke"
-
-    plugins:
-      - ssh://git@git.mood481.es:2207/mood/buildkite-plugins.git/gitea-status#v0.1.0: ~
-
     timeout_in_minutes: 10
-    agents:
-      queue: "test"
+    checkout:
+      ssh_secret: "GITEA_SSH_KEY"
+
+  - label: ":shield: Dependency audit"
+    depends_on: "build-smoke"
+    command:
+      - "./ops/audit"
+    timeout_in_minutes: 5
+    soft_fail: true
     checkout:
       ssh_secret: "GITEA_SSH_KEY"

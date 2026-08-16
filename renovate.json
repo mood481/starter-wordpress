@@ -1,50 +1,46 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "enabledManagers": [
-    "composer"
-  ],
-  "rangeStrategy": "update-lockfile",
-  "updatePinnedDependencies": false,
-  "lockFileMaintenance": {
-    "enabled": true,
-    "automerge": true
-  },
-  "packageRules": [
-    {
-      "description": "Automerge non-major stable dependency updates",
-      "matchManagers": [
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "enabledManagers": [
         "composer"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "matchCurrentVersion": "!/^0/",
-      "automerge": true
-    },
-    {
-      "description": "Never automerge major dependency updates",
-      "matchManagers": [
-        "composer"
-      ],
-      "matchUpdateTypes": [
-        "major"
-      ],
-      "automerge": false
-    },
-    {
-      "description": "Require manual approval for WordPress feature releases",
-      "matchManagers": [
-        "composer"
-      ],
-      "matchPackageNames": [
-        "roots/wordpress"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "major"
-      ],
-      "automerge": false
-    }
-  ]
+    ],
+    "rangeStrategy": "update-lockfile",
+    "updatePinnedDependencies": false,
+    "packageRules": [
+        {
+            "description": "Automerge non-major stable dependency updates",
+            "matchManagers": [
+                "composer"
+            ],
+            "matchUpdateTypes": [
+                "minor",
+                "patch"
+            ],
+            "matchCurrentVersion": "!/^0/",
+            "automerge": true
+        },
+        {
+            "description": "Never automerge major dependency updates",
+            "matchManagers": [
+                "composer"
+            ],
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "automerge": false
+        },
+        {
+            "description": "Require manual approval for WordPress feature releases",
+            "matchManagers": [
+                "composer"
+            ],
+            "matchPackageNames": [
+                "roots/wordpress"
+            ],
+            "matchUpdateTypes": [
+                "minor",
+                "major"
+            ],
+            "automerge": false
+        }
+    ]
 }

@@ -9,6 +9,7 @@ DOCKER_ARGS=(
   --volume "$ROOT:/app"
   --workdir /app
   --env COMPOSER_ALLOW_SUPERUSER=1
+  --env COMPOSER_NO_AUDIT=1
 )
 
 # Evita ficheros propiedad de root en Linux.

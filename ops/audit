@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+cd "$ROOT"
+
+echo "==> Auditing locked dependencies"
+
+if command -v composer >/dev/null 2>&1; then
+    COMPOSER=(composer)
+else
+    COMPOSER=("$ROOT/ops/local/composer")
+fi
+
+"${COMPOSER[@]}" audit \
+    --locked \
+    --abandoned=report
