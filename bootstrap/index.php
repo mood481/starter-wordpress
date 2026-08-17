@@ -1,5 +1,7 @@
 <?php
 
+// testing deploy new release
+
 declare(strict_types=1);
 
 define('WP_USE_THEMES', true);
