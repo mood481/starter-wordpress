@@ -1,6 +1,7 @@
 steps:
   - label: ":wordpress: Build, smoke & package"
     key: "release"
+    if: 'build.env("DEPLOY_ACTION") != "rollback"'
     command:
       - "./ops/test"
       - "./ops/smoke"
@@ -12,6 +13,7 @@ steps:
 
   - label: ":shield: Dependency audit"
     key: "audit"
+    if: 'build.env("DEPLOY_ACTION") != "rollback"'
     command:
       - "./ops/audit"
     timeout_in_minutes: 5
@@ -25,18 +27,41 @@ steps:
     depends_on:
       - "release"
       - "audit"
-    if: 'build.branch == "main"'
+    if: 'build.branch == "main" && build.env("DEPLOY_ACTION") != "rollback"'
 
   - label: ":rocket: Deploy test site"
     key: "deploy"
     depends_on:
       - "release"
       - "deploy-approval"
-    if: 'build.branch == "main"'
+    if: 'build.branch == "main" && build.env("DEPLOY_ACTION") != "rollback"'
     command:
       - 'buildkite-agent artifact download "dist/*" .'
       - "./ops/ci/deployer deploy -v"
     timeout_in_minutes: 10
+    concurrency: 1
+    concurrency_group: "wordpress-gear-test-deploy"
+    secrets:
+      DEPLOY_CONFIG: "WP_GEAR_DEPLOY_CONFIG"
+      DEPLOY_SSH_KEY: "MAIN_SSH_KEY"
+    checkout:
+      ssh_secret: "GITEA_SSH_KEY"
+
+
+  - block: ":rewind: Roll back test site"
+    key: "rollback-approval"
+    prompt: "Roll back the test site to the previous good Deployer release?"
+    if: 'build.source == "ui" && build.branch == "main" && build.env("DEPLOY_ACTION") == "rollback"'
+
+  - label: ":rewind: Roll back test site"
+    key: "rollback"
+    depends_on: "rollback-approval"
+    if: 'build.source == "ui" && build.branch == "main" && build.env("DEPLOY_ACTION") == "rollback"'
+    command:
+      - "./ops/ci/deployer rollback -v"
+    timeout_in_minutes: 10
+    concurrency: 1
+    concurrency_group: "wordpress-gear-test-deploy"
     secrets:
       DEPLOY_CONFIG: "WP_GEAR_DEPLOY_CONFIG"
       DEPLOY_SSH_KEY: "MAIN_SSH_KEY"
