@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEPLOYER_IMAGE="${DEPLOYER_IMAGE:-deployphp/deployer:v8.0.5}"
+
+usage() {
+    cat <<'EOF'
+Usage:
+  ./ops/deployer install
+  ./ops/deployer deploy
+  ./ops/deployer rollback
+  ./ops/deployer releases
+  ./ops/deployer <deployer arguments...>
+
+Required environment:
+  DEPLOY_HOST
+  DEPLOY_USER
+  DEPLOY_ROOT
+  DEPLOY_DOCUMENT_ROOT
+  DEPLOY_SSH_KEY_FILE
+EOF
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || $# -eq 0 ]]; then
+    usage
+    exit 0
+fi
+
+required=(
+    DEPLOY_HOST
+    DEPLOY_USER
+    DEPLOY_ROOT
+    DEPLOY_DOCUMENT_ROOT
+    DEPLOY_SSH_KEY_FILE
+)
+
+for name in "${required[@]}"; do
+    if [[ -z "${!name:-}" ]]; then
+        echo "Missing required variable: $name" >&2
+        exit 1
+    fi
+done
+
+DEPLOY_PORT="${DEPLOY_PORT:-22}"
+DEPLOY_ADAPTER="${DEPLOY_ADAPTER:-hostinger}"
+DEPLOY_KEEP_RELEASES="${DEPLOY_KEEP_RELEASES:-5}"
+
+COMMAND="$1"
+
+resolve_repo_path() {
+    local value="$1"
+
+    if [[ "$value" = /* ]]; then
+        case "$value" in
+            "$ROOT"/*)
+                printf '/app/%s\n' "${value#"$ROOT"/}"
+                ;;
+            *)
+                printf '%s\n' "$value"
+                ;;
+        esac
+    else
+        printf '/app/%s\n' "$value"
+    fi
+}
+
+KEY_FILE="$DEPLOY_SSH_KEY_FILE"
+
+if [[ "$KEY_FILE" != /* ]]; then
+    KEY_FILE="$ROOT/$KEY_FILE"
+fi
+
+if [[ ! -f "$KEY_FILE" ]]; then
+    echo "SSH private key not found: $KEY_FILE" >&2
+    exit 1
+fi
+
+RUNTIME_ENV=""
+
+if [[ -n "${INSTALL_ENV_FILE:-}" ]]; then
+    if [[ "$INSTALL_ENV_FILE" = /* ]]; then
+        HOST_RUNTIME_ENV="$INSTALL_ENV_FILE"
+    else
+        HOST_RUNTIME_ENV="$ROOT/$INSTALL_ENV_FILE"
+    fi
+
+    if [[ -f "$HOST_RUNTIME_ENV" ]]; then
+        RUNTIME_ENV="$(resolve_repo_path "$HOST_RUNTIME_ENV")"
+    fi
+fi
+
+ARTIFACT=""
+
+case "$COMMAND" in
+    install|deploy)
+        if [[ -n "${DEPLOY_ARTIFACT:-}" ]]; then
+            if [[ "$DEPLOY_ARTIFACT" = /* ]]; then
+                HOST_ARTIFACT="$DEPLOY_ARTIFACT"
+            else
+                HOST_ARTIFACT="$ROOT/$DEPLOY_ARTIFACT"
+            fi
+        else
+            HOST_ARTIFACT="$(
+                find "$ROOT/dist" \
+                    -maxdepth 1 \
+                    -type f \
+                    -name '*.tar.gz' \
+                    -print0 2>/dev/null \
+                | xargs -0 -r ls -1t \
+                | head -n 1
+            )"
+        fi
+
+        if [[ -z "${HOST_ARTIFACT:-}" || ! -f "$HOST_ARTIFACT" ]]; then
+            echo "No release artifact found." >&2
+            exit 1
+        fi
+
+        if [[ ! -f "${HOST_ARTIFACT}.sha256" ]]; then
+            echo "Missing checksum: ${HOST_ARTIFACT}.sha256" >&2
+            exit 1
+        fi
+
+        ARTIFACT="$(resolve_repo_path "$HOST_ARTIFACT")"
+        ;;
+esac
+
+if [[ "$COMMAND" == "install" && -z "$RUNTIME_ENV" ]]; then
+    echo "INSTALL_ENV_FILE must point to an existing runtime environment." >&2
+    exit 1
+fi
+
+DOCKER_ARGS=(
+    --rm
+    --volume "$ROOT:/app"
+    --volume "$KEY_FILE:/run/secrets/deploy-key:ro"
+    --workdir /app
+    --env DEPLOY_HOST
+    --env DEPLOY_USER
+    --env DEPLOY_PORT
+    --env DEPLOY_ROOT
+    --env DEPLOY_DOCUMENT_ROOT
+    --env DEPLOY_ADAPTER
+    --env DEPLOY_KEEP_RELEASES
+    --env DEPLOY_PHP_BINARY
+    --env INSTALL_SITE_TITLE
+    --env INSTALL_ADMIN_USER
+    --env INSTALL_ADMIN_PASSWORD
+    --env INSTALL_ADMIN_EMAIL
+    --env INSTALL_BLOG_PUBLIC
+    --env "DEPLOY_ARTIFACT=$ARTIFACT"
+    --env "DEPLOY_RUNTIME_ENV=$RUNTIME_ENV"
+)
+
+TTY_ARGS=()
+
+if [[ -t 0 && -t 1 ]]; then
+    TTY_ARGS=(-it)
+fi
+
+exec docker run \
+    "${TTY_ARGS[@]}" \
+    "${DOCKER_ARGS[@]}" \
+    "$DEPLOYER_IMAGE" \
+    -f deploy/deploy.php \
+    "$@"

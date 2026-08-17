@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+: "${DEPLOY_CONFIG:?DEPLOY_CONFIG is required}"
+: "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY is required}"
+
+TMP_DIR="$(mktemp -d)"
+CONFIG_FILE="$TMP_DIR/deploy.env"
+KEY_FILE="$TMP_DIR/deploy-key"
+
+cleanup() {
+    rm -rf "$TMP_DIR"
+}
+
+trap cleanup EXIT INT TERM
+
+printf '%s\n' "$DEPLOY_CONFIG" > "$CONFIG_FILE"
+printf '%s\n' "$DEPLOY_SSH_KEY" > "$KEY_FILE"
+
+chmod 600 "$CONFIG_FILE" "$KEY_FILE"
+
+set -a
+# DEPLOY_CONFIG is a trusted, shell-compatible deployment profile
+# supplied by the CI secret store.
+# shellcheck disable=SC1090
+source "$CONFIG_FILE"
+set +a
+
+export DEPLOY_SSH_KEY_FILE="$KEY_FILE"
+
+"$ROOT/ops/deployer" "$@"

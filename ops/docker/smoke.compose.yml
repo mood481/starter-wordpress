@@ -51,7 +51,14 @@ services:
     ports:
       - "127.0.0.1:${SMOKE_PORT:-8080}:80"
     volumes:
-      - ../../build/public:/var/www/html:ro
+      - ../../build/public/index.php:/var/www/public/index.php:ro
+      - ../../build/public/wp-config.php:/var/www/public/wp-config.php:ro
+      - ../../build/public/wp:/var/www/public/wp:ro
+      - ../../build/public/wp-content/mu-plugins:/var/www/public/wp-content/mu-plugins:ro
+      - ../../build/public/wp-content/plugins:/var/www/public/wp-content/plugins:ro
+      - ../../build/public/wp-content/themes:/var/www/public/wp-content/themes:ro
+      - smoke-uploads:/var/www/public/wp-content/uploads
+
       - ../../build/vendor:/var/www/vendor:ro
       - ../../build/config:/var/www/config:ro
 
@@ -62,9 +69,20 @@ services:
         condition: service_healthy
     environment: *wordpress-env
     working_dir: /var/www/html/wp
+    user: "33:33"
     volumes:
-      - ../../build/public:/var/www/html:ro
+      - ../../build/public/index.php:/var/www/public/index.php:ro
+      - ../../build/public/wp-config.php:/var/www/public/wp-config.php:ro
+      - ../../build/public/wp:/var/www/public/wp:ro
+      - ../../build/public/wp-content/mu-plugins:/var/www/public/wp-content/mu-plugins:ro
+      - ../../build/public/wp-content/plugins:/var/www/public/wp-content/plugins:ro
+      - ../../build/public/wp-content/themes:/var/www/public/wp-content/themes:ro
+      - smoke-uploads:/var/www/public/wp-content/uploads
+
       - ../../build/vendor:/var/www/vendor:ro
       - ../../build/config:/var/www/config:ro
     entrypoint:
       - wp
+
+volumes:
+  smoke-uploads:

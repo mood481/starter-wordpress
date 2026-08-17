@@ -36,11 +36,19 @@ echo "==> Starting MariaDB and WordPress runtime"
     --build \
     db app
 
+echo "==> Preparing writable runtime state"
+
+"${COMPOSE[@]}" exec \
+    -T \
+    --user root \
+    app \
+    chown -R 33:33 /var/www/public/wp-content/uploads
+
 echo "==> Installing WordPress"
 
 "${COMPOSE[@]}" run --rm cli \
     core install \
-    --path=/var/www/html/wp \
+    --path=/var/www/public/wp \
     --url="http://127.0.0.1:${SMOKE_PORT}" \
     --title="WordPress Gear Smoke" \
     --admin_user=admin \
@@ -52,7 +60,7 @@ echo "==> Checking WordPress installation"
 
 "${COMPOSE[@]}" run --rm cli \
     core is-installed \
-    --path=/var/www/html/wp
+    --path=/var/www/public/wp
 
 echo "==> Checking HTTP runtime"
 
