@@ -18,12 +18,6 @@ deploy/
     └── hostinger.php
 ```
 
-`wordpress-artifact.php` contains application and WordPress behavior.
-
-`shared.php` contains generic behavior for shared-hosting targets with a fixed document root.
-
-Provider-specific differences belong in individual target adapters such as `hostinger.php`.
-
 ## Artifact contract
 
 Deployer receives an already built `.tar.gz` plus its `.sha256`.
@@ -36,23 +30,11 @@ vendor/
 public/
 ```
 
-It does not contain:
+It does not contain runtime `.env`, database data, uploads, logs, cache, repository source or CI configuration.
 
-```text
-.env
-database
-uploads
-logs
-cache
-source repository
-CI configuration
-```
-
-The artifact is verified before extraction.
+`config/wordpress.php` is part of the artifact and declares application-level WordPress state that must match the active release.
 
 ## Remote release layout
-
-Deployer owns a deployment root separate from the provider document root.
 
 Typical layout:
 
@@ -60,18 +42,37 @@ Typical layout:
 <deploy-root>/
 ├── .dep/
 ├── releases/
-│   ├── 1/
-│   ├── 2/
-│   └── ...
 ├── shared/
 │   ├── .env
 │   └── public/wp-content/uploads/
 └── current -> releases/<active>
 ```
 
-Each release receives links to the shared runtime configuration and uploads.
-
 The database is external persistent state and is never part of a release.
+
+## WordPress state reconciliation
+
+The deployment recipe reads desired WordPress state from:
+
+```text
+config/wordpress.php
+```
+
+The current implemented reconciliation covers the active theme.
+
+For every relevant release transition it:
+
+1. checks that WordPress is installed;
+2. reads `theme.parent` and `theme.active`;
+3. verifies that both themes exist in the release;
+4. activates the configured active theme;
+5. verifies the resulting WordPress `template` and `stylesheet` options.
+
+This works whether the project uses Twenty Twenty-Five directly or an optional project child theme.
+
+The reconciliation runs after install and normal deploy, and again after rollback so persistent database options remain aligned with the code release that is currently active.
+
+Plugin activation is intentionally not implemented yet; the `plugins` declaration is reserved for the upcoming plugin baseline.
 
 ## Install
 
@@ -88,43 +89,24 @@ Conceptually it:
 7. publishes the target document root;
 8. runs `wp core install` only if WordPress is not already installed;
 9. sets `home`, `siteurl` and indexing visibility;
-10. performs an HTTP health check.
+10. applies the desired WordPress theme state;
+11. performs an HTTP health check.
 
-Installation is intentionally defensive. It must not silently overwrite unknown content in the hosting document root.
+A child theme is not required. A pristine starter installation activates Twenty Twenty-Five.
 
 ## Deploy
 
-Normal deployment does not receive or replace runtime configuration.
+Normal deployment requires the remote shared `.env` to already exist.
 
-It requires the remote shared `.env` to already exist, creates a new release from the CI/local artifact, activates it and runs the health check.
-
-```text
-artifact
-  ↓
-verify
-  ↓
-new release
-  ↓
-shared links
-  ↓
-current switch
-  ↓
-target publication
-  ↓
-health check
-```
+It creates a new release from the validated artifact, activates it, reconciles WordPress state and runs the health check.
 
 The same database, uploads and runtime configuration survive every release.
 
 ## Rollback
 
-Rollback uses Deployer's release history.
+Rollback points `current` back to the previous Deployer release, reconciles the WordPress theme state from that release, and performs the application health check afterward.
 
-It points `current` back to the previous Deployer release and performs the application health check afterward.
-
-A rollback changes application code only. It does not roll back database changes or runtime state.
-
-Projects that later introduce schema/data migrations must define their own compatibility and rollback policy before such migrations become part of deployment.
+A rollback changes application code and the application-controlled WordPress options required to match that code. It does not roll back general database content or other runtime state.
 
 ## Health check
 
@@ -136,35 +118,17 @@ WP_SITEURL + /wp-login.php
 
 A successful 2xx/3xx response is required.
 
-The health check is deliberately small. More application-specific checks may be added by projects without changing the generic release lifecycle.
-
 ## Credentials
 
 The generic Deployer runner expects an explicit SSH identity file.
 
-Local execution points to an existing private key.
-
-CI materializes its SSH secret as a temporary private-key file and then invokes the same runner.
-
-Deployer itself therefore uses the same authentication model in every execution environment.
+Local execution points to an existing private key. CI materializes its SSH secret as a temporary private-key file and invokes the same runner.
 
 ## Deployment commands
 
-Generic runner:
-
 ```bash
 ./ops/deployer <task>
-```
-
-Local adapter:
-
-```bash
 ./ops/local/deployer <task>
-```
-
-CI adapter:
-
-```bash
 ./ops/ci/deployer <task>
 ```
 

@@ -12,7 +12,7 @@ The architecture is intentionally independent from a specific hosting provider o
 - Composer resolves PHP and WordPress dependencies.
 - `composer.lock` is always versioned and defines the versions actually deployed.
 - Third-party plugins and themes are dependencies, not committed installed code.
-- `src/` contains only code managed by the project.
+- Project-managed plugins, themes and mu-plugins live under `src/`.
 - `build/` and `dist/` are generated and never versioned.
 - Runtime state is separate from application releases.
 - Production does not install dependencies or build application code.
@@ -28,12 +28,14 @@ The source repository contains:
 
 ```text
 bootstrap/      versioned WordPress entry points
-config/         common and environment-aware runtime configuration
-src/            optional project-managed plugins, themes and mu-plugins
+config/         runtime and desired WordPress state
+src/            project-managed plugins, themes and mu-plugins
 deploy/         deployment recipes and target adapters
-ops/            operational commands
+ops/            operational commands and starter scaffolding
 docs/           project documentation
 ```
+
+`src/` is source code and must remain versioned. Empty source directories may contain `.gitkeep` until a project adds its own code.
 
 A build produces:
 
@@ -76,11 +78,11 @@ WP_SITEURL=https://example.com/wp
 
 `WP_HOME` is the public site URL. `WP_SITEURL` is the URL where the WordPress core is exposed.
 
-## Configuration
+## Runtime configuration
 
 `bootstrap/wp-config.php` is a small versioned loader.
 
-Effective configuration lives in:
+Effective runtime configuration lives in:
 
 ```text
 config/application.php
@@ -101,6 +103,59 @@ Common defaults should be safe for production. Environment files only override t
 
 The eight WordPress authentication keys and salts are generated once when preparing a new runtime configuration and persist with that environment. They are not regenerated on deploy.
 
+## Desired WordPress state
+
+Versioned WordPress state that belongs to the application, rather than to the runtime environment, is declared in:
+
+```text
+config/wordpress.php
+```
+
+The current contract declares:
+
+```text
+theme.parent
+theme.active
+plugins
+```
+
+The starter itself is valid without project-specific source code and therefore defaults to:
+
+```text
+theme.parent = twentytwentyfive
+theme.active = twentytwentyfive
+```
+
+A project may optionally replace the active theme with its own child theme.
+
+The theme state is enforced by smoke tests and deployment. Plugin state is reserved for the plugin baseline and will follow the same model.
+
+## Theme model
+
+Twenty Twenty-Five is the Composer-managed baseline theme.
+
+The starter does not contain a generated child theme. `src/themes/` is intentionally empty until a project chooses to create one.
+
+For projects that need their own child theme, Gear provides an optional one-shot scaffold:
+
+```bash
+./ops/starter/bootstrap-theme <slug> "<name>"
+```
+
+It creates:
+
+```text
+src/themes/<slug>/
+├── style.css
+└── theme.json
+```
+
+and changes `theme.active` in `config/wordpress.php` from `twentytwentyfive` to the generated project theme.
+
+The scaffold is a project-initialization convenience, not a requirement for building, testing or deploying the starter.
+
+Reusable application behavior should normally live in plugins or mu-plugins rather than in a shared intermediate child theme.
+
 ## Dependencies
 
 `composer.json` expresses supported dependency ranges. `composer.lock` defines the deployed versions.
@@ -111,14 +166,46 @@ The eight WordPress authentication keys and salts are generated once when prepar
 - Renovate maintains compatible dependency updates and lock-file changes.
 - Dependency audit is an explicit operation and is not implicitly coupled to dependency updates.
 
-The starter does not require WP Packages by default. It is added only when a project actually needs WordPress.org packages such as `wp-plugin/*` or `wp-theme/*`. WP Packages is therefore an upstream package provider, not part of the platform contract.
+The starter currently uses WP Packages because the baseline Twenty Twenty-Five theme is distributed through WordPress.org. The repository is scoped to WordPress package types such as `wp-theme/*` and `wp-plugin/*`.
 
-Premium packages may come directly from vendors or from private package infrastructure when required.
+WP Packages is an upstream package provider, not part of the Gear platform contract.
 
-`src/` is optional. When present, the build copies its immediate `mu-plugins/`,
-`plugins/` and `themes/` children into the corresponding WordPress content
-directories. This is for code managed by the project rather than for Composer
-dependencies.
+During build, immediate children of `src/mu-plugins/`, `src/plugins/` and `src/themes/` are copied into the corresponding WordPress content directories. Build collisions with Composer-installed packages are rejected.
+
+## Build and validation contract
+
+The release flow is explicit:
+
+```text
+build
+  ↓
+test
+  ↓
+smoke
+  ↓
+package
+```
+
+Each operation has one responsibility:
+
+```text
+build       produces build/
+test        validates the generated build statically
+smoke       validates the build in a disposable WordPress runtime
+package     packages the existing build without rebuilding it
+```
+
+The starter itself is validated using Twenty Twenty-Five as the active theme.
+
+The optional theme scaffolder can test itself independently:
+
+```bash
+./ops/starter/bootstrap-theme --test
+```
+
+That self-test uses a temporary project workspace and never modifies the repository.
+
+Audit is intentionally independent from the release chain.
 
 ## Runtime state
 
@@ -165,7 +252,7 @@ Generic deployment behavior must not contain provider-specific branches. Provide
 
 A new project and an adopted existing WordPress installation must eventually converge on the same runtime structure and release artifact.
 
-Greenfield installation is part of the supported deployment lifecycle.
+Greenfield installation is part of the supported deployment lifecycle. A project may use Twenty Twenty-Five directly or optionally bootstrap its own child theme before development starts.
 
 Brownfield adoption is a separate migration process. It may require project-specific work to inventory dependencies, move project code into `src/`, preserve the database and uploads, and align configuration. That one-time migration must not complicate the normal deploy path.
 
@@ -174,13 +261,3 @@ Brownfield adoption is a separate migration process. It may require project-spec
 Current implementations include Buildkite for CI/CD and Hostinger shared hosting as a deployment target.
 
 Neither is an architectural dependency.
-
-A future CI provider should only need to:
-
-1. check out the repository;
-2. run the `ops/` commands;
-3. persist the package artifact;
-4. provide deployment configuration and credentials;
-5. invoke the Deployer runner.
-
-A future hosting target should implement the deployment capabilities required by the relevant Deployer target adapter.

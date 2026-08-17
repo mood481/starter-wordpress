@@ -14,12 +14,12 @@ rm -rf "$BUILD_DIR"
 echo "==> Installing application dependencies"
 
 if command -v composer >/dev/null 2>&1; then
-    COMPOSER=(composer)
+    COMPOSER_CMD=(composer)
 else
-    COMPOSER=("$ROOT/ops/local/composer")
+    COMPOSER_CMD=("$ROOT/ops/local/composer")
 fi
 
-"${COMPOSER[@]}" install \
+"${COMPOSER_CMD[@]}" install \
     --no-dev \
     --no-interaction \
     --prefer-dist \

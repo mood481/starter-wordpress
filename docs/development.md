@@ -7,30 +7,37 @@ Local development and maintenance require only:
 - Git
 - Docker
 
-The provided Docker wrappers use pinned Composer, Renovate and Deployer images.
-`ops/test` always uses the Composer wrapper. `ops/build` and `ops/audit` use a
-locally installed Composer when one is available and otherwise fall back to the
-wrapper.
+A local PHP or Composer installation is not required.
 
-## Generated directories
+The local wrappers provide pinned Composer, Renovate and Deployer environments. Build and test may use a locally available Composer executable when present and otherwise fall back to the Docker Composer wrapper.
 
-The build and package output directories are generated and must remain outside
-Git:
+## Source and generated directories
+
+Project-managed source lives under:
+
+```text
+src/
+├── mu-plugins/
+├── plugins/
+└── themes/
+```
+
+These directories are versioned and must not be ignored. Empty directories may contain `.gitkeep`.
+
+Generated output remains outside Git:
 
 ```text
 build/
 dist/
 ```
 
-The top-level `vendor/` directory is also ignored defensively, although this
-project installs dependencies in `build/vendor/`.
+The top-level `vendor/` directory is also ignored defensively, although this project installs dependencies in `build/vendor/`.
 
-Runtime and local secret files matching `.env.*.local` must also remain
-unversioned.
+Runtime and local secret files matching `.env.*.local` must remain unversioned.
 
 ## Composer
 
-Use the Docker wrapper:
+Use the Docker wrapper when invoking Composer directly:
 
 ```bash
 ./ops/local/composer validate
@@ -42,6 +49,8 @@ Use the Docker wrapper:
 Composer is responsible for WordPress core, PHP dependencies and Composer-managed WordPress packages.
 
 The configured vendor directory is inside `build/`, so dependency installation contributes directly to the generated build tree.
+
+The current starter also resolves the Twenty Twenty-Five parent theme through WP Packages.
 
 ## Renovate
 
@@ -59,46 +68,136 @@ Common commands:
 LOG_LEVEL=debug ./ops/local/renovate dry-run
 ```
 
-Renovate currently maintains Composer dependencies. It updates the lock file
-without widening declared dependency ranges. Compatible updates are proposed
-through pull requests, and automerge is disabled.
+Renovate currently maintains Composer dependencies. Compatible updates are proposed through pull requests, and automerge remains disabled until CI status reporting back to Gitea is available.
+
+## Starter operations
+
+Starter-specific one-shot operations live under:
+
+```text
+ops/starter/
+```
+
+They are distinct from `ops/local/`, which contains wrappers for operational tools executed from a local workstation.
+
+### Optional child theme bootstrap
+
+The starter itself uses Twenty Twenty-Five directly and does not contain a generated child theme.
+
+A project can optionally create its own child theme with:
+
+```bash
+./ops/starter/bootstrap-theme <slug> "<name>"
+```
+
+Example:
+
+```bash
+./ops/starter/bootstrap-theme llif "Llif"
+```
+
+The command:
+
+1. validates the project theme slug;
+2. requires the starter to still use `twentytwentyfive` as parent and active theme;
+3. creates `src/themes/<slug>/style.css`;
+4. creates `src/themes/<slug>/theme.json`;
+5. changes `theme.active` in `config/wordpress.php` to the generated project theme.
+
+It does not run Composer, connect to WordPress, modify the database or deploy anything.
+
+It is intentionally one-shot and refuses to overwrite an existing theme or an already customized active-theme declaration.
+
+### Bootstrap self-test
+
+The operation contains its own optional self-test:
+
+```bash
+./ops/starter/bootstrap-theme --test
+```
+
+The self-test creates a temporary minimal starter workspace, runs the bootstrap there, validates the generated files and state change, verifies that a second bootstrap is rejected, and removes the temporary workspace.
+
+It never modifies the actual repository and is not part of the normal CI release pipeline.
+
+## Desired WordPress state
+
+The starter default is:
+
+```php
+return [
+    'theme' => [
+        'parent' => 'twentytwentyfive',
+        'active' => 'twentytwentyfive',
+    ],
+    'plugins' => [],
+];
+```
+
+After an optional project theme bootstrap, only the active theme changes:
+
+```php
+'theme' => [
+    'parent' => 'twentytwentyfive',
+    'active' => '<project-theme>',
+],
+```
+
+`plugins` is reserved for the plugin baseline.
 
 ## Build and validation
 
-The normal local validation flow is:
+The normal local release-validation flow is:
 
 ```bash
+./ops/build
 ./ops/test
 ./ops/smoke
-./ops/audit
 ./ops/package
 ```
 
+Dependency audit is independent:
+
+```bash
+./ops/audit
+```
+
+### `ops/build`
+
+Builds the application into `build/`.
+
+It:
+
+- removes the previous build;
+- installs dependencies using `composer.lock`;
+- creates the WordPress content structure;
+- copies the bootstrap and configuration files;
+- copies project-managed code from `src/`.
+
+It is the only release-validation script that creates or replaces `build/`.
+
 ### `ops/test`
 
-Validates Composer metadata and the generated application structure.
+Statically validates an existing build.
 
-It also builds the application, so running `ops/test` is the normal entry point before smoke testing and packaging.
+It does not build the application. If `build/` is missing, run `./ops/build` first.
 
 ### `ops/smoke`
 
-Starts an isolated Docker runtime with WordPress and MariaDB and performs a real WordPress installation plus an HTTP login-page check.
+Starts an isolated Docker runtime with WordPress and MariaDB and performs a real WordPress installation.
 
-The smoke environment mirrors the runtime filesystem contract:
+Smoke reads the expected parent and active theme from `config/wordpress.php`, verifies that both are installed, activates the configured theme, verifies the resulting `template` and `stylesheet` WordPress options, and checks the WordPress login page over HTTP.
+
+This works unchanged in both states:
 
 ```text
-/var/www/
-├── config/                     read-only
-├── vendor/                     read-only
-└── public/
-    ├── index.php               read-only
-    ├── wp-config.php           read-only
-    ├── wp/                     read-only
-    └── wp-content/
-        ├── mu-plugins/         read-only
-        ├── plugins/            read-only
-        ├── themes/             read-only
-        └── uploads/            writable disposable volume
+starter
+  parent = twentytwentyfive
+  active = twentytwentyfive
+
+project with child theme
+  parent = twentytwentyfive
+  active = <project-theme>
 ```
 
 The database and uploads volume are disposable and removed at the end of the smoke test.
@@ -106,8 +205,6 @@ The database and uploads volume are disposable and removed at the end of the smo
 ### `ops/audit`
 
 Runs Composer dependency auditing as an explicit operation.
-
-Dependency updates do not implicitly run audit. This keeps dependency resolution and security reporting as separate concerns.
 
 ### `ops/package`
 
@@ -121,24 +218,6 @@ No `.env`, deployment credentials or runtime state are included.
 
 Local deployment uses Deployer through Docker.
 
-A local deployment profile is loaded by:
-
-```bash
-./ops/local/deployer
-```
-
-The current profile file is `.env.install.local`.
-
-It contains target connection information and, for first installation only, the initial WordPress administrator data and the path to the runtime environment file.
-
-An explicit SSH identity file is required:
-
-```dotenv
-DEPLOY_SSH_KEY_FILE=/absolute/path/to/private-key
-```
-
-The private key itself must not be stored in the environment file.
-
 Typical commands:
 
 ```bash
@@ -149,30 +228,3 @@ Typical commands:
 ```
 
 `install` is for a new target. Normal releases use `deploy`.
-
-## Runtime configuration
-
-A deployment environment uses a local runtime configuration file, for example:
-
-```text
-.env.runtime.staging.local
-.env.runtime.prod.local
-```
-
-It contains values such as:
-
-```text
-WP_ENVIRONMENT_TYPE
-WP_HOME
-WP_SITEURL
-DB_*
-AUTH_*
-*_SALT
-```
-
-For a local initial installation, the deployment profile points to it through
-`INSTALL_ENV_FILE`.
-
-During a first installation, empty WordPress authentication keys and salts are generated before the runtime configuration is persisted remotely.
-
-Subsequent deploys reuse the remote shared environment and do not replace it implicitly.

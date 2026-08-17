@@ -3,16 +3,24 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUILD_DIR="$ROOT/build"
 
 cd "$ROOT"
 
+if [[ ! -d "$BUILD_DIR" ]]; then
+    echo "Missing build artifact. Run ./ops/build first." >&2
+    exit 1
+fi
+
 echo "==> Validating Composer configuration"
 
-"$ROOT/ops/local/composer" validate --strict
+if command -v composer >/dev/null 2>&1; then
+    COMPOSER_CMD=(composer)
+else
+    COMPOSER_CMD=("$ROOT/ops/local/composer")
+fi
 
-echo "==> Building application"
-
-"$ROOT/ops/build"
+"${COMPOSER_CMD[@]}" validate --strict
 
 echo "==> Validating build structure"
 
@@ -22,14 +30,28 @@ required_files=(
     "build/public/wp-config.php"
     "build/public/wp/wp-settings.php"
     "build/config/application.php"
+    "build/config/wordpress.php"
     "build/config/environments/development.php"
     "build/config/environments/staging.php"
     "build/config/environments/production.php"
 )
 
+required_directories=(
+    "build/public/wp-content/mu-plugins"
+    "build/public/wp-content/plugins"
+    "build/public/wp-content/themes"
+)
+
 for file in "${required_files[@]}"; do
     if [[ ! -f "$ROOT/$file" ]]; then
         echo "Missing build artifact: $file" >&2
+        exit 1
+    fi
+done
+
+for directory in "${required_directories[@]}"; do
+    if [[ ! -d "$ROOT/$directory" ]]; then
+        echo "Missing build artifact: $directory" >&2
         exit 1
     fi
 done

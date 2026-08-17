@@ -18,7 +18,7 @@ required_paths=(
 for path in "${required_paths[@]}"; do
     if [[ ! -e "$path" ]]; then
         echo "Missing build artifact: $path" >&2
-        echo "Run ./ops/test before packaging." >&2
+        echo "Run ./ops/build before packaging." >&2
         exit 1
     fi
 done

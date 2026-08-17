@@ -1,8 +1,9 @@
 steps:
-  - label: ":wordpress: Build, smoke & package"
+  - label: ":wordpress: Build & validate release"
     key: "release"
     if: 'build.env("DEPLOY_ACTION") != "rollback"'
     command:
+      - "./ops/build"
       - "./ops/test"
       - "./ops/smoke"
       - "./ops/package"
@@ -21,9 +22,9 @@ steps:
     checkout:
       ssh_secret: "GITEA_SSH_KEY"
 
-  - block: ":rocket: Deploy test site"
+  - block: ":rocket: Approve test deployment"
     key: "deploy-approval"
-    prompt: "Deploy the artifact produced by this build?"
+    prompt: "Deploy the release artifact produced by this build?"
     depends_on:
       - "release"
       - "audit"
@@ -47,8 +48,7 @@ steps:
     checkout:
       ssh_secret: "GITEA_SSH_KEY"
 
-
-  - block: ":rewind: Roll back test site"
+  - block: ":rewind: Approve test rollback"
     key: "rollback-approval"
     prompt: "Roll back the test site to the previous good Deployer release?"
     if: 'build.source == "ui" && build.branch == "main" && build.env("DEPLOY_ACTION") == "rollback"'

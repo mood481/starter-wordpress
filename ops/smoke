@@ -25,7 +25,12 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [[ ! -f "$ROOT/build/public/wp/wp-settings.php" ]]; then
-    echo "Missing build artifact. Run ./ops/test first." >&2
+    echo "Missing build artifact. Run ./ops/build first." >&2
+    exit 1
+fi
+
+if [[ ! -f "$ROOT/build/config/wordpress.php" ]]; then
+    echo "Missing WordPress state configuration in build artifact." >&2
     exit 1
 fi
 
@@ -44,6 +49,32 @@ echo "==> Preparing writable runtime state"
     app \
     chown -R 33:33 /var/www/public/wp-content/uploads
 
+echo "==> Reading expected WordPress state"
+
+THEME_PARENT="$(
+    "${COMPOSE[@]}" exec -T app php -r '
+        $config = require "/var/www/config/wordpress.php";
+        echo $config["theme"]["parent"] ?? "";
+    '
+)"
+
+THEME_ACTIVE="$(
+    "${COMPOSE[@]}" exec -T app php -r '
+        $config = require "/var/www/config/wordpress.php";
+        echo $config["theme"]["active"] ?? "";
+    '
+)"
+
+if [[ -z "$THEME_PARENT" ]]; then
+    echo "Missing theme.parent in config/wordpress.php." >&2
+    exit 1
+fi
+
+if [[ -z "$THEME_ACTIVE" ]]; then
+    echo "Missing theme.active in config/wordpress.php." >&2
+    exit 1
+fi
+
 echo "==> Installing WordPress"
 
 "${COMPOSE[@]}" run --rm cli \
@@ -56,11 +87,47 @@ echo "==> Installing WordPress"
     --admin_email=admin@example.test \
     --skip-email
 
-echo "==> Checking WordPress installation"
+echo "==> Applying WordPress state"
+
+"${COMPOSE[@]}" run --rm cli \
+    theme is-installed "$THEME_PARENT" \
+    --path=/var/www/public/wp
+
+"${COMPOSE[@]}" run --rm cli \
+    theme is-installed "$THEME_ACTIVE" \
+    --path=/var/www/public/wp
+
+"${COMPOSE[@]}" run --rm cli \
+    theme activate "$THEME_ACTIVE" \
+    --path=/var/www/public/wp
+
+echo "==> Checking WordPress state"
 
 "${COMPOSE[@]}" run --rm cli \
     core is-installed \
     --path=/var/www/public/wp
+
+ACTUAL_THEME="$(
+    "${COMPOSE[@]}" run --rm cli \
+        option get stylesheet \
+        --path=/var/www/public/wp
+)"
+
+ACTUAL_PARENT="$(
+    "${COMPOSE[@]}" run --rm cli \
+        option get template \
+        --path=/var/www/public/wp
+)"
+
+if [[ "$ACTUAL_THEME" != "$THEME_ACTIVE" ]]; then
+    echo "Unexpected active theme: expected '$THEME_ACTIVE', got '$ACTUAL_THEME'." >&2
+    exit 1
+fi
+
+if [[ "$ACTUAL_PARENT" != "$THEME_PARENT" ]]; then
+    echo "Unexpected parent theme: expected '$THEME_PARENT', got '$ACTUAL_PARENT'." >&2
+    exit 1
+fi
 
 echo "==> Checking HTTP runtime"
 

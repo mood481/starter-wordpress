@@ -27,6 +27,34 @@ PHP;
     return trim(run('{{bin/php}} -r ' . escapeshellarg($code)));
 }
 
+function releaseWordPressConfig(): array
+{
+    $code = <<<'PHP'
+$config = require "{{current_path}}/config/wordpress.php";
+
+if (!is_array($config)) {
+    fwrite(STDERR, "config/wordpress.php must return an array.\n");
+    exit(1);
+}
+
+echo json_encode($config, JSON_THROW_ON_ERROR);
+PHP;
+
+    $json = trim(run('{{bin/php}} -r ' . escapeshellarg($code)));
+    $config = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+    if (!is_array($config)) {
+        throw new \RuntimeException('Invalid config/wordpress.php.');
+    }
+
+    return $config;
+}
+
+function wordpressCli(): string
+{
+    return '{{bin/php}} {{bin/wp}} --path={{current_path}}/public/wp --skip-plugins --skip-themes';
+}
+
 task('gear:runtime:prepare', function () {
     $runtimeEnv = (string) get('runtime_env');
     requireLocalFile($runtimeEnv, 'Runtime environment');
@@ -148,12 +176,14 @@ task('gear:artifact:upload', function () {
 task('gear:artifact:validate', function () {
     $required = [
         'config',
+        'config/wordpress.php',
         'vendor',
         'public',
         'public/index.php',
         'public/wp-config.php',
         'public/wp',
         'public/wp-content',
+        'public/wp-content/themes',
     ];
 
     foreach ($required as $path) {
@@ -168,6 +198,13 @@ task('gear:target:publish', function () {
 });
 
 task('gear:wordpress:install', function () {
+    $wp = wordpressCli();
+
+    if (test($wp . ' core is-installed')) {
+        info('WordPress is already installed');
+        return;
+    }
+
     $requiredConfig = [
         'install_site_title',
         'install_admin_user',
@@ -179,13 +216,6 @@ task('gear:wordpress:install', function () {
         if ((string) get($name) === '') {
             throw new \RuntimeException("Missing install configuration: {$name}");
         }
-    }
-
-    $wp = '{{bin/php}} {{bin/wp}} --path={{current_path}}/public/wp --skip-plugins --skip-themes';
-
-    if (test($wp . ' core is-installed')) {
-        info('WordPress is already installed');
-        return;
     }
 
     $home = releaseRuntimeValue('WP_HOME');
@@ -211,6 +241,71 @@ task('gear:wordpress:install', function () {
         $wp . ' option update blog_public ' .
         escapeshellarg((string) get('install_blog_public'))
     );
+});
+
+task('gear:wordpress:configure', function () {
+    $wp = wordpressCli();
+
+    if (!test($wp . ' core is-installed')) {
+        throw new \RuntimeException(
+            'WordPress is not installed. Run the install task first.'
+        );
+    }
+
+    $config = releaseWordPressConfig();
+    $theme = $config['theme'] ?? null;
+
+    if (!is_array($theme)) {
+        throw new \RuntimeException(
+            'Missing theme configuration in config/wordpress.php.'
+        );
+    }
+
+    $parent = trim((string) ($theme['parent'] ?? ''));
+    $active = trim((string) ($theme['active'] ?? ''));
+
+    if ($parent === '') {
+        throw new \RuntimeException(
+            'Missing theme.parent in config/wordpress.php.'
+        );
+    }
+
+    if ($active === '') {
+        throw new \RuntimeException(
+            'Missing theme.active in config/wordpress.php.'
+        );
+    }
+
+    if (!test($wp . ' theme is-installed ' . escapeshellarg($parent))) {
+        throw new \RuntimeException(
+            "Configured parent theme is not installed: {$parent}"
+        );
+    }
+
+    if (!test($wp . ' theme is-installed ' . escapeshellarg($active))) {
+        throw new \RuntimeException(
+            "Configured active theme is not installed: {$active}"
+        );
+    }
+
+    run($wp . ' theme activate ' . escapeshellarg($active));
+
+    $actualActive = trim(run($wp . ' option get stylesheet'));
+    $actualParent = trim(run($wp . ' option get template'));
+
+    if ($actualActive !== $active) {
+        throw new \RuntimeException(
+            "Unexpected active theme: expected {$active}, got {$actualActive}."
+        );
+    }
+
+    if ($actualParent !== $parent) {
+        throw new \RuntimeException(
+            "Unexpected parent theme: expected {$parent}, got {$actualParent}."
+        );
+    }
+
+    info("WordPress theme configured: {$active} (parent: {$parent})");
 });
 
 task('gear:healthcheck', function () {
@@ -250,6 +345,7 @@ task('deploy', [
     'deploy:setup',
     'gear:runtime:require',
     'gear:release',
+    'gear:wordpress:configure',
     'gear:healthcheck',
 ]);
 
@@ -260,7 +356,13 @@ task('install', [
     'gear:runtime:prepare',
     'gear:release',
     'gear:wordpress:install',
+    'gear:wordpress:configure',
     'gear:healthcheck',
 ]);
 
-after('rollback', 'gear:healthcheck');
+task('gear:rollback:validate', [
+    'gear:wordpress:configure',
+    'gear:healthcheck',
+]);
+
+after('rollback', 'gear:rollback:validate');
