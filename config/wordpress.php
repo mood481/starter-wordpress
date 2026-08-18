@@ -11,11 +11,15 @@ return [
     'plugins' => [
         'active' => [
             'secure-passkeys',
-            'cache-enabler',
         ],
 
         'inactive' => [
             'bunnycdn',
+            'cache-enabler',
         ],
-    ]
+    ],
+
+    'mu_plugins' => [
+        'mood-wordpress-policies',
+    ],
 ];

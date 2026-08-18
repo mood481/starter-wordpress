@@ -50,9 +50,48 @@ PHP;
     return $config;
 }
 
-function wordpressCli(): string
+function wordpressCli(bool $loadExtensions = false): string
 {
-    return '{{bin/php}} {{bin/wp}} --path={{current_path}}/public/wp --skip-plugins --skip-themes';
+    $command = '{{bin/php}} {{bin/wp}} --path={{current_path}}/public/wp';
+
+    if (!$loadExtensions) {
+        $command .= ' --skip-plugins --skip-themes';
+    }
+
+    return $command;
+}
+
+function wordpressConfigList(mixed $value, string $name): array
+{
+    if ($value === null) {
+        return [];
+    }
+
+    if (!is_array($value)) {
+        throw new \RuntimeException(
+            "{$name} in config/wordpress.php must be an array."
+        );
+    }
+
+    $items = [];
+
+    foreach ($value as $item) {
+        if (!is_string($item) || trim($item) === '') {
+            throw new \RuntimeException(
+                "{$name} in config/wordpress.php must contain non-empty strings."
+            );
+        }
+
+        $items[] = trim($item);
+    }
+
+    if (count($items) !== count(array_unique($items))) {
+        throw new \RuntimeException(
+            "{$name} in config/wordpress.php contains duplicate entries."
+        );
+    }
+
+    return $items;
 }
 
 task('gear:runtime:prepare', function () {
@@ -183,6 +222,8 @@ task('gear:artifact:validate', function () {
         'public/wp-config.php',
         'public/wp',
         'public/wp-content',
+        'public/wp-content/mu-plugins',
+        'public/wp-content/plugins',
         'public/wp-content/themes',
     ];
 
@@ -245,6 +286,7 @@ task('gear:wordpress:install', function () {
 
 task('gear:wordpress:configure', function () {
     $wp = wordpressCli();
+    $runtimeWp = wordpressCli(true);
 
     if (!test($wp . ' core is-installed')) {
         throw new \RuntimeException(
@@ -253,6 +295,10 @@ task('gear:wordpress:configure', function () {
     }
 
     $config = releaseWordPressConfig();
+
+    /*
+     * Theme state.
+     */
     $theme = $config['theme'] ?? null;
 
     if (!is_array($theme)) {
@@ -262,7 +308,7 @@ task('gear:wordpress:configure', function () {
     }
 
     $parent = trim((string) ($theme['parent'] ?? ''));
-    $active = trim((string) ($theme['active'] ?? ''));
+    $activeTheme = trim((string) ($theme['active'] ?? ''));
 
     if ($parent === '') {
         throw new \RuntimeException(
@@ -270,7 +316,7 @@ task('gear:wordpress:configure', function () {
         );
     }
 
-    if ($active === '') {
+    if ($activeTheme === '') {
         throw new \RuntimeException(
             'Missing theme.active in config/wordpress.php.'
         );
@@ -282,20 +328,24 @@ task('gear:wordpress:configure', function () {
         );
     }
 
-    if (!test($wp . ' theme is-installed ' . escapeshellarg($active))) {
+    if (!test($wp . ' theme is-installed ' . escapeshellarg($activeTheme))) {
         throw new \RuntimeException(
-            "Configured active theme is not installed: {$active}"
+            "Configured active theme is not installed: {$activeTheme}"
         );
     }
 
-    run($wp . ' theme activate ' . escapeshellarg($active));
+    $currentTheme = trim(run($wp . ' option get stylesheet'));
 
-    $actualActive = trim(run($wp . ' option get stylesheet'));
+    if ($currentTheme !== $activeTheme) {
+        run($wp . ' theme activate ' . escapeshellarg($activeTheme));
+    }
+
+    $actualTheme = trim(run($wp . ' option get stylesheet'));
     $actualParent = trim(run($wp . ' option get template'));
 
-    if ($actualActive !== $active) {
+    if ($actualTheme !== $activeTheme) {
         throw new \RuntimeException(
-            "Unexpected active theme: expected {$active}, got {$actualActive}."
+            "Unexpected active theme: expected {$activeTheme}, got {$actualTheme}."
         );
     }
 
@@ -305,7 +355,123 @@ task('gear:wordpress:configure', function () {
         );
     }
 
-    info("WordPress theme configured: {$active} (parent: {$parent})");
+    /*
+     * Standard plugin state.
+     */
+    $plugins = $config['plugins'] ?? [];
+
+    if (!is_array($plugins)) {
+        throw new \RuntimeException(
+            'plugins in config/wordpress.php must be an array.'
+        );
+    }
+
+    $activePlugins = wordpressConfigList(
+        $plugins['active'] ?? [],
+        'plugins.active'
+    );
+
+    $inactivePlugins = wordpressConfigList(
+        $plugins['inactive'] ?? [],
+        'plugins.inactive'
+    );
+
+    $overlap = array_values(array_intersect($activePlugins, $inactivePlugins));
+
+    if ($overlap !== []) {
+        throw new \RuntimeException(
+            'Plugins cannot be both active and inactive: ' .
+            implode(', ', $overlap)
+        );
+    }
+
+    foreach ($activePlugins as $plugin) {
+        if (!test($wp . ' plugin is-installed ' . escapeshellarg($plugin))) {
+            throw new \RuntimeException(
+                "Configured plugin is not installed: {$plugin}"
+            );
+        }
+
+        if (!test($wp . ' plugin is-active ' . escapeshellarg($plugin))) {
+            run($wp . ' plugin activate ' . escapeshellarg($plugin));
+        }
+    }
+
+    foreach ($inactivePlugins as $plugin) {
+        if (!test($wp . ' plugin is-installed ' . escapeshellarg($plugin))) {
+            throw new \RuntimeException(
+                "Configured plugin is not installed: {$plugin}"
+            );
+        }
+
+        if (test($wp . ' plugin is-active ' . escapeshellarg($plugin))) {
+            run($wp . ' plugin deactivate ' . escapeshellarg($plugin));
+        }
+    }
+
+    foreach ($activePlugins as $plugin) {
+        if (!test($wp . ' plugin is-active ' . escapeshellarg($plugin))) {
+            throw new \RuntimeException(
+                "Expected plugin to be active: {$plugin}"
+            );
+        }
+    }
+
+    foreach ($inactivePlugins as $plugin) {
+        if (test($wp . ' plugin is-active ' . escapeshellarg($plugin))) {
+            throw new \RuntimeException(
+                "Expected plugin to be inactive: {$plugin}"
+            );
+        }
+    }
+
+    /*
+     * MU-plugin state.
+     *
+     * Unlike the commands above, this intentionally loads the WordPress
+     * runtime so WP-CLI can observe the actual must-use plugins.
+     */
+    $muPlugins = wordpressConfigList(
+        $config['mu_plugins'] ?? [],
+        'mu_plugins'
+    );
+
+    if ($muPlugins !== []) {
+        $loadedMuPlugins = preg_split(
+            '/\R/',
+            trim(run(
+                $runtimeWp .
+                ' plugin list --status=must-use --field=name --skip-update-check'
+            ))
+        );
+
+        $loadedMuPlugins = array_values(array_filter(
+            array_map('trim', $loadedMuPlugins ?: []),
+            static fn (string $plugin): bool => $plugin !== ''
+        ));
+
+        foreach ($muPlugins as $plugin) {
+            if (!in_array($plugin, $loadedMuPlugins, true)) {
+                throw new \RuntimeException(
+                    "Expected MU-plugin to be loaded: {$plugin}"
+                );
+            }
+        }
+    }
+
+    info("WordPress theme configured: {$activeTheme} (parent: {$parent})");
+
+    if ($activePlugins !== []) {
+        info('active plugins: ' . implode(', ', $activePlugins));
+    }
+
+    if ($inactivePlugins !== []) {
+        info('inactive plugins: ' . implode(', ', $inactivePlugins));
+    }
+
+    if ($muPlugins !== []) {
+        info('MU-plugins loaded: ' . implode(', ', $muPlugins));
+    }
 });
 
 task('gear:healthcheck', function () {

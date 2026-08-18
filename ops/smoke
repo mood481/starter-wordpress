@@ -67,6 +67,7 @@ THEME_ACTIVE="$(
 
 PLUGINS_ACTIVE=()
 PLUGINS_INACTIVE=()
+MU_PLUGINS=()
 
 # macOS still ships Bash 3.2, which does not provide the mapfile builtin.
 # The PHP commands below run inside the container, but this orchestration
@@ -94,6 +95,20 @@ done < <(
         $config = require "/var/www/config/wordpress.php";
 
         foreach ($config["plugins"]["inactive"] ?? [] as $plugin) {
+            echo $plugin, PHP_EOL;
+        }
+    '
+)
+
+while IFS= read -r plugin; do
+    if [[ -n "$plugin" ]]; then
+        MU_PLUGINS[${#MU_PLUGINS[@]}]="$plugin"
+    fi
+done < <(
+    "${COMPOSE[@]}" exec -T app php -r '
+        $config = require "/var/www/config/wordpress.php";
+
+        foreach ($config["mu_plugins"] ?? [] as $plugin) {
             echo $plugin, PHP_EOL;
         }
     '
@@ -220,6 +235,39 @@ for plugin in "${PLUGINS_INACTIVE[@]}"; do
         exit 1
     fi
 done
+
+MU_PLUGIN_NAMES="$(
+    "${COMPOSE[@]}" run --rm cli \
+        plugin list \
+        --status=must-use \
+        --field=name \
+        --skip-update-check \
+        --path=/var/www/public/wp
+)"
+
+for plugin in "${MU_PLUGINS[@]}"; do
+    if ! printf '%s\n' "$MU_PLUGIN_NAMES" | grep -Fxq "$plugin"; then
+        echo "Expected MU-plugin to be loaded: $plugin" >&2
+        exit 1
+    fi
+done
+
+# The cli service uses the WordPress CLI image. Arguments passed through
+# `docker compose run cli ...` are WP-CLI commands even though the literal
+# `wp` executable does not appear in this host-side orchestration script.
+if printf '%s\n' "${MU_PLUGINS[@]}" | grep -Fxq "mood-wordpress-policies"; then
+    "${COMPOSE[@]}" run --rm cli \
+        eval '
+            if (!class_exists("Mood\\WordPress\\Policies\\Plugin")) {
+                fwrite(
+                    STDERR,
+                    "Mood WordPress Policies runtime class did not load.\n"
+                );
+                exit(1);
+            }
+        ' \
+        --path=/var/www/public/wp
+fi
 
 echo "==> Checking HTTP runtime"
 
