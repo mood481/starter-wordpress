@@ -216,16 +216,16 @@
         },
         {
             "name": "mood/wordpress-policies",
-            "version": "0.1.5",
+            "version": "0.1.6",
             "source": {
                 "type": "git",
                 "url": "https://git.mood481.es/mood/wordpress-policies",
-                "reference": "0.1.5"
+                "reference": "0.1.6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://git.mood481.es/api/packages/mood/composer/files/mood%2Fwordpress-policies/0.1.5/mood-wordpress-policies.0.1.5.zip",
-                "shasum": "ddadf46a7cccf0ee9a8006ec19f7f3a3d622d95a"
+                "url": "https://git.mood481.es/api/packages/mood/composer/files/mood%2Fwordpress-policies/0.1.6/mood-wordpress-policies.0.1.6.zip",
+                "shasum": "2f61f4a93e049cc677cb5049966350409dc5f9d8"
             },
             "require": {
                 "php": "^8.3"
@@ -244,7 +244,7 @@
                 "proprietary"
             ],
             "description": "Code-driven WordPress security and exposure policies for Mood sites.",
-            "time": "2026-08-18T16:05:58+00:00"
+            "time": "2026-08-18T16:50:05+00:00"
         },
         {
             "name": "phpoption/phpoption",

@@ -498,12 +498,7 @@ task('gear:release', [
     'deploy:shared',
     'deploy:symlink',
     'gear:target:publish',
-    'deploy:unlock',
-    'deploy:cleanup',
-    'deploy:success',
 ]);
-
-fail('gear:release', 'deploy:unlock');
 
 desc('Deploys a previously built Gear artifact');
 task('deploy', [
@@ -513,7 +508,12 @@ task('deploy', [
     'gear:release',
     'gear:wordpress:configure',
     'gear:healthcheck',
+    'deploy:unlock',
+    'deploy:cleanup',
+    'deploy:success',
 ]);
+
+fail('deploy', 'deploy:unlock');
 
 desc('Installs a Gear artifact and initializes WordPress if necessary');
 task('install', [
@@ -524,7 +524,12 @@ task('install', [
     'gear:wordpress:install',
     'gear:wordpress:configure',
     'gear:healthcheck',
+    'deploy:unlock',
+    'deploy:cleanup',
+    'deploy:success',
 ]);
+
+fail('install', 'deploy:unlock');
 
 task('gear:rollback:validate', [
     'gear:wordpress:configure',
