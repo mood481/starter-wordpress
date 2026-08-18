@@ -8,5 +8,14 @@ return [
         'active' => 'twentytwentyfive',
     ],
 
-    'plugins' => [],
+    'plugins' => [
+        'active' => [
+            'secure-passkeys',
+            'cache-enabler',
+        ],
+
+        'inactive' => [
+            'bunnycdn',
+        ],
+    ]
 ];

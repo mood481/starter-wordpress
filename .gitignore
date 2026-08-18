@@ -14,6 +14,7 @@ vendor/
 dist/
 
 # Local scratch
+tmp/
 *.tmp
 *.log
 

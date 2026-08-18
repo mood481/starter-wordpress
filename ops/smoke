@@ -65,6 +65,40 @@ THEME_ACTIVE="$(
     '
 )"
 
+PLUGINS_ACTIVE=()
+PLUGINS_INACTIVE=()
+
+# macOS still ships Bash 3.2, which does not provide the mapfile builtin.
+# The PHP commands below run inside the container, but this orchestration
+# block runs in the host shell, so populate the arrays with portable reads.
+while IFS= read -r plugin; do
+    if [[ -n "$plugin" ]]; then
+        PLUGINS_ACTIVE[${#PLUGINS_ACTIVE[@]}]="$plugin"
+    fi
+done < <(
+    "${COMPOSE[@]}" exec -T app php -r '
+        $config = require "/var/www/config/wordpress.php";
+
+        foreach ($config["plugins"]["active"] ?? [] as $plugin) {
+            echo $plugin, PHP_EOL;
+        }
+    '
+)
+
+while IFS= read -r plugin; do
+    if [[ -n "$plugin" ]]; then
+        PLUGINS_INACTIVE[${#PLUGINS_INACTIVE[@]}]="$plugin"
+    fi
+done < <(
+    "${COMPOSE[@]}" exec -T app php -r '
+        $config = require "/var/www/config/wordpress.php";
+
+        foreach ($config["plugins"]["inactive"] ?? [] as $plugin) {
+            echo $plugin, PHP_EOL;
+        }
+    '
+)
+
 if [[ -z "$THEME_PARENT" ]]; then
     echo "Missing theme.parent in config/wordpress.php." >&2
     exit 1
@@ -97,9 +131,47 @@ echo "==> Applying WordPress state"
     theme is-installed "$THEME_ACTIVE" \
     --path=/var/www/public/wp
 
-"${COMPOSE[@]}" run --rm cli \
-    theme activate "$THEME_ACTIVE" \
-    --path=/var/www/public/wp
+CURRENT_THEME="$(
+    "${COMPOSE[@]}" run --rm cli \
+        option get stylesheet \
+        --path=/var/www/public/wp
+)"
+
+if [[ "$CURRENT_THEME" != "$THEME_ACTIVE" ]]; then
+    "${COMPOSE[@]}" run --rm cli \
+        theme activate "$THEME_ACTIVE" \
+        --path=/var/www/public/wp
+fi
+
+for plugin in "${PLUGINS_ACTIVE[@]}"; do
+    "${COMPOSE[@]}" run --rm cli \
+        plugin is-installed "$plugin" \
+        --path=/var/www/public/wp
+
+    if ! "${COMPOSE[@]}" run --rm cli \
+        plugin is-active "$plugin" \
+        --path=/var/www/public/wp \
+        >/dev/null 2>&1; then
+        "${COMPOSE[@]}" run --rm cli \
+            plugin activate "$plugin" \
+            --path=/var/www/public/wp
+    fi
+done
+
+for plugin in "${PLUGINS_INACTIVE[@]}"; do
+    "${COMPOSE[@]}" run --rm cli \
+        plugin is-installed "$plugin" \
+        --path=/var/www/public/wp
+
+    if "${COMPOSE[@]}" run --rm cli \
+        plugin is-active "$plugin" \
+        --path=/var/www/public/wp \
+        >/dev/null 2>&1; then
+        "${COMPOSE[@]}" run --rm cli \
+            plugin deactivate "$plugin" \
+            --path=/var/www/public/wp
+    fi
+done
 
 echo "==> Checking WordPress state"
 
@@ -128,6 +200,26 @@ if [[ "$ACTUAL_PARENT" != "$THEME_PARENT" ]]; then
     echo "Unexpected parent theme: expected '$THEME_PARENT', got '$ACTUAL_PARENT'." >&2
     exit 1
 fi
+
+for plugin in "${PLUGINS_ACTIVE[@]}"; do
+    if ! "${COMPOSE[@]}" run --rm cli \
+        plugin is-active "$plugin" \
+        --path=/var/www/public/wp \
+        >/dev/null 2>&1; then
+        echo "Expected plugin to be active: $plugin" >&2
+        exit 1
+    fi
+done
+
+for plugin in "${PLUGINS_INACTIVE[@]}"; do
+    if "${COMPOSE[@]}" run --rm cli \
+        plugin is-active "$plugin" \
+        --path=/var/www/public/wp \
+        >/dev/null 2>&1; then
+        echo "Expected plugin to be inactive: $plugin" >&2
+        exit 1
+    fi
+done
 
 echo "==> Checking HTTP runtime"
 
