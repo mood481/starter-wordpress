@@ -1,23 +1,70 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ENV_FILE="${COMPOSER_ENV_FILE:-$ROOT/.env.composer.local}"
 COMPOSER_IMAGE="${COMPOSER_IMAGE:-composer:2.10.2}"
 
-DOCKER_ARGS=(
-  --rm
-  --volume "$ROOT:/app"
-  --workdir /app
-  --env COMPOSER_ALLOW_SUPERUSER=1
-  --env COMPOSER_NO_AUDIT=1
-)
-
-# Evita ficheros propiedad de root en Linux.
-if [[ "$(uname -s)" == "Linux" ]]; then
-  DOCKER_ARGS+=(
-    --user "$(id -u):$(id -g)"
-    --env HOME=/tmp
-  )
+if [[ -f "$ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
 fi
 
-exec docker run "${DOCKER_ARGS[@]}" "$COMPOSER_IMAGE" "$@"
+if [[ -n "${GITEA_PACKAGE_USER:-}" && -z "${GITEA_PACKAGE_TOKEN:-}" ]]; then
+    echo "GITEA_PACKAGE_TOKEN is required when GITEA_PACKAGE_USER is set." >&2
+    exit 1
+fi
+
+if [[ -z "${GITEA_PACKAGE_USER:-}" && -n "${GITEA_PACKAGE_TOKEN:-}" ]]; then
+    echo "GITEA_PACKAGE_USER is required when GITEA_PACKAGE_TOKEN is set." >&2
+    exit 1
+fi
+
+DOCKER_ARGS=(
+    --rm
+    --volume "$ROOT:/app"
+    --workdir /app
+    --env COMPOSER_ALLOW_SUPERUSER=1
+    --env COMPOSER_NO_AUDIT=1
+)
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+    DOCKER_ARGS+=(
+        --user "$(id -u):$(id -g)"
+    )
+fi
+
+if [[ -n "${COMPOSER_AUTH:-}" ]]; then
+    DOCKER_ARGS+=(
+        --env COMPOSER_AUTH
+    )
+elif [[ -n "${GITEA_PACKAGE_USER:-}" ]]; then
+    json_escape() {
+        printf '%s' "$1" \
+            | sed \
+                -e 's/\\/\\\\/g' \
+                -e 's/"/\\"/g'
+    }
+
+    USER_JSON="$(json_escape "$GITEA_PACKAGE_USER")"
+    TOKEN_JSON="$(json_escape "$GITEA_PACKAGE_TOKEN")"
+
+    COMPOSER_AUTH="$(
+        printf \
+            '{"http-basic":{"git.mood481.es":{"username":"%s","password":"%s"}}}' \
+            "$USER_JSON" \
+            "$TOKEN_JSON"
+    )"
+
+    DOCKER_ARGS+=(
+        --env "COMPOSER_AUTH=$COMPOSER_AUTH"
+    )
+fi
+
+exec docker run \
+    "${DOCKER_ARGS[@]}" \
+    "$COMPOSER_IMAGE" \
+    "$@"

@@ -9,6 +9,8 @@ steps:
       - "./ops/package"
       - 'buildkite-agent artifact upload "dist/*"'
     timeout_in_minutes: 10
+    secrets:
+      COMPOSER_AUTH: "WP_GEAR_COMPOSER_AUTH"
     checkout:
       ssh_secret: "GITEA_SSH_KEY"
 
@@ -19,6 +21,8 @@ steps:
       - "./ops/audit"
     timeout_in_minutes: 5
     soft_fail: true
+    secrets:
+      COMPOSER_AUTH: "WP_GEAR_COMPOSER_AUTH"
     checkout:
       ssh_secret: "GITEA_SSH_KEY"
 
