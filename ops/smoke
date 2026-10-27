@@ -285,9 +285,15 @@ echo "==> Checking HTTP runtime"
     }
 '
 
-echo "==> Smoke test passed"
+HEADLESS_MODE="$(
+    "${COMPOSE[@]}" exec -T app php -r '
+        $config = require "/var/www/config/wordpress.php";
+        echo $config["mode"] ?? "standard";
+    '
+)"
 
-echo "==> Checking headless REST API"
+if [[ "$HEADLESS_MODE" == "headless" ]]; then
+    echo "==> Checking headless REST API"
 "${COMPOSE[@]}" exec -T app php -r '
     $json = @file_get_contents("http://127.0.0.1/?rest_route=%2Fgear%2Fv1%2Fhealth");
     $result = $json === false ? null : json_decode($json, true);
@@ -296,3 +302,6 @@ echo "==> Checking headless REST API"
         exit(1);
     }
 '
+fi
+
+echo "==> Smoke test passed"

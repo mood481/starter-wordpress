@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 /**
  * Plugin Name: Mood WordPress Policies
- * Description: WP Polices for login, app passwords and api rest auth
+ * Description: Project-controlled login, app-password and REST security policies
  */
+
+defined('ABSPATH') || exit;
 
 require_once WPMU_PLUGIN_DIR . '/wordpress-policies/mood-wordpress-policies.php';
 

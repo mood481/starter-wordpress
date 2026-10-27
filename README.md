@@ -4,7 +4,7 @@ A reproducible WordPress starter for projects managed as buildable and deployabl
 
 The repository contains application source and configuration. WordPress core and third-party packages are dependencies; CI builds and validates a self-contained release artifact before deployment.
 
-The default profile is headless with a minimal project-owned theme and a read-only REST API. See [Headless profile](docs/headless.md). Conventional WordPress frontends require an explicit project theme.\n\n## Requirements
+The default profile is headless with a minimal project-owned theme and a versioned REST API extension. The same starter can generate **standard or headless**, **standalone or monorepo** consumers. See [Profiles and project generation](docs/headless.md).\n\n## Requirements
 
 Local maintenance requires:
 
