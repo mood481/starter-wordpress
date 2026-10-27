@@ -1,26 +1,32 @@
 steps:
-  - label: ":wordpress: Build & validate release"
-    key: "release"
+  - label: ":wordpress: Build & validate"
+    key: "validate"
     if: 'build.env("DEPLOY_ACTION") != "rollback"'
     command:
       - "./ops/build"
       - "./ops/test"
       - "./ops/smoke"
-      - "./ops/package"
-      - 'buildkite-agent artifact upload "dist/*"'
+      - |
+        if [ "${BUILDKITE_BRANCH:-}" = "main" ] || \
+           [ "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" = "main" ]; then
+          ./ops/package
+          buildkite-agent artifact upload "dist/*"
+        else
+          echo "==> Skipping release package for non-main branch build"
+        fi
     timeout_in_minutes: 10
     secrets:
       COMPOSER_AUTH: "WP_GEAR_COMPOSER_AUTH"
     checkout:
       ssh_secret: "GITEA_SSH_KEY"
 
-  - label: ":shield: Dependency audit"
+  - label: ":shield: Audit release dependencies"
     key: "audit"
-    if: 'build.env("DEPLOY_ACTION") != "rollback"'
+    depends_on: "validate"
+    if: 'build.branch == "main" && build.env("GEAR_RELEASE_TAG") != null && build.env("DEPLOY_ACTION") != "rollback"'
     command:
       - "./ops/audit"
     timeout_in_minutes: 5
-    soft_fail: true
     secrets:
       COMPOSER_AUTH: "WP_GEAR_COMPOSER_AUTH"
     checkout:
@@ -28,18 +34,19 @@ steps:
 
   - block: ":rocket: Approve test deployment"
     key: "deploy-approval"
-    prompt: "Deploy the release artifact produced by this build?"
+    prompt: "Deploy the release artifact produced by this tag?"
     depends_on:
-      - "release"
+      - "validate"
       - "audit"
-    if: 'build.branch == "main" && build.env("DEPLOY_ACTION") != "rollback"'
+    if: 'build.branch == "main" && build.env("GEAR_RELEASE_TAG") != null && build.env("DEPLOY_ACTION") != "rollback"'
 
   - label: ":rocket: Deploy test site"
     key: "deploy"
     depends_on:
-      - "release"
+      - "validate"
+      - "audit"
       - "deploy-approval"
-    if: 'build.branch == "main" && build.env("DEPLOY_ACTION") != "rollback"'
+    if: 'build.branch == "main" && build.env("GEAR_RELEASE_TAG") != null && build.env("DEPLOY_ACTION") != "rollback"'
     command:
       - 'buildkite-agent artifact download "dist/*" .'
       - "./ops/ci/deployer deploy -v"

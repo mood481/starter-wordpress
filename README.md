@@ -16,9 +16,9 @@ Local PHP, Composer and Deployer installations are not required.
 ## Main commands
 
 ```bash
+./ops/build
 ./ops/test
 ./ops/smoke
-./ops/audit
 ./ops/package
 ```
 

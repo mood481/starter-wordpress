@@ -57,7 +57,7 @@ The current starter also resolves the Twenty Twenty-Five parent theme through WP
 Create the local configuration from the example and provide the required tokens:
 
 ```bash
-cp .env.renovate.example .env.renovate.local
+cp docs/env.examples/env.renovate.example .env.renovate.local
 ```
 
 Common commands:
