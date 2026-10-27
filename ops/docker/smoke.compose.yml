@@ -63,7 +63,7 @@ services:
       - ../../build/config:/var/www/config:ro
 
   cli:
-    image: wordpress:cli-php8.3
+    image: wordpress:cli-php8.4
     depends_on:
       db:
         condition: service_healthy

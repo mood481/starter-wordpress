@@ -50,7 +50,7 @@ Composer is responsible for WordPress core, PHP dependencies and Composer-manage
 
 The configured vendor directory is inside `build/`, so dependency installation contributes directly to the generated build tree.
 
-The current starter also resolves the Twenty Twenty-Five parent theme through WP Packages.
+The headless starter uses a minimal versioned theme in `src/themes/gear-headless/`; no third-party theme is installed by default.
 
 ## Renovate
 
@@ -82,7 +82,7 @@ They are distinct from `ops/local/`, which contains wrappers for operational too
 
 ### Optional child theme bootstrap
 
-The starter itself uses Twenty Twenty-Five directly and does not contain a generated child theme.
+The starter itself uses the Gear Headless theme directly and does not contain a generated child theme.
 
 A project can optionally create its own child theme with:
 
@@ -127,8 +127,8 @@ The starter default is:
 ```php
 return [
     'theme' => [
-        'parent' => 'twentytwentyfive',
-        'active' => 'twentytwentyfive',
+        'parent' => 'gear-headless',
+        'active' => 'gear-headless',
     ],
     'plugins' => [],
 ];

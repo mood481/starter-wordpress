@@ -286,3 +286,13 @@ echo "==> Checking HTTP runtime"
 '
 
 echo "==> Smoke test passed"
+
+echo "==> Checking headless REST API"
+"${COMPOSE[@]}" exec -T app php -r '
+    $json = @file_get_contents("http://127.0.0.1/?rest_route=%2Fgear%2Fv1%2Fhealth");
+    $result = $json === false ? null : json_decode($json, true);
+    if (!is_array($result) || ($result["status"] ?? "") !== "ok") {
+        fwrite(STDERR, "Headless API smoke test failed.\n");
+        exit(1);
+    }
+'

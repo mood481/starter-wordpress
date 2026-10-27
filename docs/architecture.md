@@ -122,8 +122,8 @@ plugins
 The starter itself is valid without project-specific source code and therefore defaults to:
 
 ```text
-theme.parent = twentytwentyfive
-theme.active = twentytwentyfive
+theme.parent = gear-headless
+theme.active = gear-headless
 ```
 
 A project may optionally replace the active theme with its own child theme.
@@ -132,9 +132,9 @@ The theme state is enforced by smoke tests and deployment. Plugin state is reser
 
 ## Theme model
 
-Twenty Twenty-Five is the Composer-managed baseline theme.
+Gear Headless is a minimal project-owned baseline theme, with no third-party theme dependency.
 
-The starter does not contain a generated child theme. `src/themes/` is intentionally empty until a project chooses to create one.
+The starter contains only a minimal non-rendering theme. Projects using a conventional WordPress frontend must explicitly provide a theme.
 
 For projects that need their own child theme, Gear provides an optional one-shot scaffold:
 
@@ -195,7 +195,7 @@ smoke       validates the build in a disposable WordPress runtime
 package     packages the existing build without rebuilding it
 ```
 
-The starter itself is validated using Twenty Twenty-Five as the active theme.
+The starter itself is validated with the minimal Gear Headless theme.
 
 The optional theme scaffolder can test itself independently:
 
