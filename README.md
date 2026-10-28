@@ -38,6 +38,16 @@ Deployment:
 ./ops/local/deployer releases
 ```
 
+## Operations
+
+`ops/local/` contains Docker wrappers for workstation maintenance.
+`ops/starter/` contains one-shot scaffolding tools.
+`ops/build`, `ops/test`, `ops/smoke`, `ops/audit`, and `ops/package` are provider-independent build and verification commands.
+`ops/ci/` adapts credentials for deployment from CI.
+CircleCI currently runs build and tests only; package publishing and deployment are not configured.
+
+The versioned `src/mu-plugins/mood-wordpress-policies.php` file is a project-owned *loader and policy configuration adapter*, not the Composer dependency itself: WordPress loads root MU-plugin PHP files but not nested packages automatically. Composer installs `mood/wordpress-policies` under `wp-content/mu-plugins/wordpress-policies/`.
+
 ## Repository model
 
 ```text

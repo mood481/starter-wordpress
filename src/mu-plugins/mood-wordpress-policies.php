@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 /**
  * Plugin Name: Mood WordPress Policies
- * Description: Project-controlled login, app-password and REST security policies
+ * Description: Root MU-plugin loader and project configuration adapter for the Composer-installed policies package
  */
 
 defined('ABSPATH') || exit;
 
+// WordPress automatically loads root MU-plugin PHP files, not nested folders.
+// The actual implementation belongs to Composer package mood/wordpress-policies.
+// Fail loudly if that dependency is missing, rather than silently disabling policy.
 require_once WPMU_PLUGIN_DIR . '/wordpress-policies/mood-wordpress-policies.php';
 
 /*

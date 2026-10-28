@@ -44,7 +44,7 @@ generate() {
     # New consumers must resolve their own lock after selecting dependencies.
     rm -f "$dest/composer.lock"
     if [[ "$layout" == "monorepo" ]]; then
-        rm -rf "$dest/.buildkite"
+        rm -rf "$dest/.buildkite" "$dest/.circleci"
     fi
 
     # Reuse core starter templates; never patch a theme from the source checkout.
@@ -87,8 +87,18 @@ EOF
             -e "s/'parent' => 'gear-headless'/'parent' => '$slug'/" \
             -e "s/'active' => 'gear-headless'/'active' => '$slug'/" \
             -e "s/'secure-passkeys', 'gear-headless-api'/'secure-passkeys'/" \
-            -e "s/'rest_api' => \\[/'rest_api' => ['enabled' => false,/" \
             "$config"
+        # Update the existing REST policy flag in place; do not introduce a
+        # second 'enabled' key (PHP would use the last one).
+        awk '
+            /'\''rest_api'\''[[:space:]]*=>[[:space:]]*\[/ { inside_rest=1 }
+            inside_rest && /'\''enabled'\''[[:space:]]*=>[[:space:]]*true/ {
+                sub(/'\''enabled'\''[[:space:]]*=>[[:space:]]*true/, "'\''enabled'\'' => false")
+                inside_rest=0
+            }
+            { print }
+        ' "$config" > "$config.tmp"
+        mv "$config.tmp" "$config"
     else
         local plugin="$dest/src/plugins/$slug-api"
         mkdir -p "$plugin"
@@ -147,20 +157,39 @@ EOF
 }
 
 self_test() {
-    local temp
+    local temp mode layout target config
     temp="$(mktemp -d)"
     trap 'rm -rf "$temp"' EXIT
-    generate headless standalone example "Example" "$temp/headless"
-    generate standard monorepo classic "Classic" "$temp/mono/apps/classic"
-    grep -Fq "'mode' => 'headless'" "$temp/headless/config/wordpress.php"
-    grep -Fq "'mode' => 'standard'" "$temp/mono/apps/classic/config/wordpress.php"
-    grep -Fq "'example-api'" "$temp/headless/config/wordpress.php"
-    grep -Fq "'classic'" "$temp/mono/apps/classic/config/wordpress.php"
-    [[ -f "$temp/headless/src/plugins/example-api/example-api.php" ]]
-    [[ -f "$temp/mono/apps/classic/src/themes/classic/style.css" ]]
-    [[ ! -e "$temp/mono/apps/classic/.buildkite" ]]
-    [[ ! -e "$temp/headless/composer.lock" ]]
-    echo "Project generator self-test passed"
+
+    for mode in headless standard; do
+        for layout in standalone monorepo; do
+            target="$temp/${mode}-${layout}"
+            generate "$mode" "$layout" "example" "Example" "$target"
+            config="$target/config/wordpress.php"
+            [[ -f "$config" && -f "$target/composer.json" ]]
+            [[ ! -e "$target/composer.lock" ]]
+            [[ ! -e "$target/ops/ci/no-such-file" ]]
+            if [[ "$layout" == "monorepo" ]]; then
+                [[ ! -e "$target/.buildkite" ]]
+                [[ ! -e "$target/.circleci" ]]
+            else
+                [[ -f "$target/.circleci/config.yml" ]]
+            fi
+            if [[ "$mode" == "headless" ]]; then
+                [[ -f "$target/src/plugins/example-api/example-api.php" ]]
+                grep -Fq "'mode' => 'headless'" "$config"
+                grep -Fq "'example-api'" "$config"
+            else
+                [[ -f "$target/src/themes/example/style.css" ]]
+                grep -Fq "'mode' => 'standard'" "$config"
+                grep -Fq "'enabled' => false" "$config"
+                if grep -Fq "'gear-headless-api'" "$config"; then
+                    die "Standard profile still activates the headless plugin"
+                fi
+            fi
+        done
+    done
+    echo "Project generator self-test passed (four combinations)"
 }
 
 if [[ "${1:-}" == "--test" ]]; then

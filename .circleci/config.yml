@@ -1,0 +1,33 @@
+version: 2.1
+
+# First CircleCI integration: build and test only, never deploy or publish.
+jobs:
+  build-and-test:
+    machine:
+      image: ubuntu-2404:current
+    environment:
+      COMPOSE_DOCKER_CLI_BUILD: "1"
+    steps:
+      - checkout
+      - run:
+          name: Verify Docker and Compose
+          command: |
+            docker version
+            docker compose version
+      - run:
+          name: Check project generator (all four profiles)
+          command: ./ops/starter/create-project --test
+      - run:
+          name: Build WordPress application
+          command: ./ops/build
+      - run:
+          name: Test build contract
+          command: ./ops/test
+      - run:
+          name: Smoke WordPress with MariaDB
+          command: ./ops/smoke
+
+workflows:
+  verify:
+    jobs:
+      - build-and-test
