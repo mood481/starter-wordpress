@@ -43,6 +43,13 @@ for mode in headless standard; do
     [[ -x "$dest/ops/serve" ]]
     [[ ! -e "$ROOT/ops/serve" ]]
     bash -n "$dest/ops/serve"
+    # WP-CLI is called both non-interactively and with redirected stdin.
+    # Any 'docker compose run' without -T may fail with "input device is not a TTY".
+    if grep -Eq 'run --rm cli' "$dest/ops/serve"; then
+      echo "serve uses WP-CLI with an allocated TTY" >&2
+      exit 1
+    fi
+    [[ "$(grep -c 'run -T --rm cli' "$dest/ops/serve")" -eq 4 ]]
     [[ -f "$dest/.env.composer.local" && -f "$dest/.env.serve.local" ]]
     [[ -f "$dest/docs/env.examples/env.serve.example" ]]
     cmp -s "$dest/docs/env.examples/env.serve.example" "$dest/.env.serve.local"
