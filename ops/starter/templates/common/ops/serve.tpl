@@ -47,15 +47,21 @@ esac
   echo "Missing composer.lock: first run ./ops/local/composer update --with-all-dependencies" >&2
   exit 1
 }
+# Rebuilding replaces bind-mounted files. Stop running containers first while
+# keeping the named database/uploads volume intact.
+echo "==> Stopping existing local containers (persistent data preserved)"
+"${COMPOSE[@]}" down --remove-orphans
 echo "==> Building WordPress"
 "$ROOT/ops/build"
 echo "==> Starting persistent WordPress and MariaDB containers"
 "${COMPOSE[@]}" up -d --build --wait db app
 "${COMPOSE[@]}" exec -T --user root app chown -R 33:33 /var/www/public/wp-content/uploads
 
-if ! "${COMPOSE[@]}" run --rm cli core is-installed --path=/var/www/public/wp >/dev/null 2>&1; then
+# WP-CLI invocations must never allocate a pseudo-TTY: plugin activation
+# happens from a redirected stdin, and local runs may be non-interactive.
+if ! "${COMPOSE[@]}" run -T --rm cli core is-installed --path=/var/www/public/wp >/dev/null 2>&1; then
   echo "==> First local WordPress installation"
-  "${COMPOSE[@]}" run --rm cli core install \
+  "${COMPOSE[@]}" run -T --rm cli core install \
     --path=/var/www/public/wp \
     --url="http://127.0.0.1:$SMOKE_PORT" \
     --title="Local WordPress" \
@@ -73,10 +79,10 @@ state="$( "${COMPOSE[@]}" exec -T app php -r '
 ')"
 theme="${state%%$'\n'*}"
 [[ -n "$theme" ]] || { echo "Missing active theme in config/wordpress.php" >&2; exit 1; }
-"${COMPOSE[@]}" run --rm cli theme activate "$theme" --path=/var/www/public/wp
+"${COMPOSE[@]}" run -T --rm cli theme activate "$theme" --path=/var/www/public/wp
 while IFS= read -r plugin; do
   [[ -n "$plugin" ]] || continue
-  "${COMPOSE[@]}" run --rm cli plugin activate "$plugin" --path=/var/www/public/wp
+  "${COMPOSE[@]}" run -T --rm cli plugin activate "$plugin" --path=/var/www/public/wp
 done <<< "${state#*$'\n'}"
 
 echo "WordPress: http://127.0.0.1:$SMOKE_PORT"
