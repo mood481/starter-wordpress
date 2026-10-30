@@ -136,23 +136,7 @@ Gear Headless is a minimal project-owned baseline theme, with no third-party the
 
 The starter contains only a minimal non-rendering theme. Projects using a conventional WordPress frontend must explicitly provide a theme.
 
-For projects that need their own child theme, Gear provides an optional one-shot scaffold:
-
-```bash
-./ops/starter/bootstrap-theme <slug> "<name>"
-```
-
-It creates:
-
-```text
-src/themes/<slug>/
-├── style.css
-└── theme.json
-```
-
-and changes `theme.active` in `config/wordpress.php` from `twentytwentyfive` to the generated project theme.
-
-The scaffold is a project-initialization convenience, not a requirement for building, testing or deploying the starter.
+`create-project --mode standard` selects a Composer-managed Twenty Twenty-Five parent and a project-owned child theme. `create-project --mode headless` selects Gear Headless. The project generator uses profile templates rather than modifying PHP configuration with shell text replacements.
 
 Reusable application behavior should normally live in plugins or mu-plugins rather than in a shared intermediate child theme.
 
@@ -166,7 +150,7 @@ Reusable application behavior should normally live in plugins or mu-plugins rath
 - Renovate maintains compatible dependency updates and lock-file changes.
 - Dependency audit is an explicit operation and is not implicitly coupled to dependency updates.
 
-The starter currently uses WP Packages because the baseline Twenty Twenty-Five theme is distributed through WordPress.org. The repository is scoped to WordPress package types such as `wp-theme/*` and `wp-plugin/*`.
+The standard consumer profile uses WP Packages for Twenty Twenty-Five; the headless baseline has no third-party theme dependency. The repository is scoped to WordPress package types such as `wp-theme/*` and `wp-plugin/*`.
 
 WP Packages is an upstream package provider, not part of the Gear platform contract.
 
@@ -197,13 +181,7 @@ package     packages the existing build without rebuilding it
 
 The starter itself is validated with the minimal Gear Headless theme.
 
-The optional theme scaffolder can test itself independently:
-
-```bash
-./ops/starter/bootstrap-theme --test
-```
-
-That self-test uses a temporary project workspace and never modifies the repository.
+Generator templates are tested with `./ops/starter/tests/create-project.sh` across four profile/layout combinations.
 
 Audit is intentionally independent from the release chain.
 
@@ -252,7 +230,7 @@ Generic deployment behavior must not contain provider-specific branches. Provide
 
 A new project and an adopted existing WordPress installation must eventually converge on the same runtime structure and release artifact.
 
-Greenfield installation is part of the supported deployment lifecycle. A project may use Twenty Twenty-Five directly or optionally bootstrap its own child theme before development starts.
+Greenfield installation selects a complete theme strategy through the headless or standard project profile.
 
 Brownfield adoption is a separate migration process. It may require project-specific work to inventory dependencies, move project code into `src/`, preserve the database and uploads, and align configuration. That one-time migration must not complicate the normal deploy path.
 

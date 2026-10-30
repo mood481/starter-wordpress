@@ -9,16 +9,17 @@ check() {
     php -r '
       $c=require $argv[1]; $j=json_decode(file_get_contents($argv[2]),true,512,JSON_THROW_ON_ERROR);
       $m=$argv[3];$s=$argv[4];
-      assert($c["mode"]===$m); assert($j["name"]==="mood/$s-wordpress");
-      assert($j["require"]["mood/wordpress-policies"]==="^0.2");
-      assert($c["theme"]["parent"]===($m==="standard"?"twentytwentyfive":"gear-headless"));
+      function ensure(bool $ok): void { if (!$ok) { fwrite(STDERR,"Generator configuration mismatch\n"); exit(1); } }
+      ensure($c["mode"]===$m); ensure($j["name"]==="mood/$s-wordpress");
+      ensure($j["require"]["mood/wordpress-policies"]==="^0.2");
+      ensure($c["theme"]["parent"]===($m==="standard"?"twentytwentyfive":"gear-headless"));
       if($m==="standard") {
-        assert($c["theme"]["active"]===$s);
-        assert($c["policies"]["rest_api"]["enabled"]===false);
-        assert(isset($j["require"]["wp-theme/twentytwentyfive"]));
+        ensure($c["theme"]["active"]===$s);
+        ensure($c["policies"]["rest_api"]["enabled"]===false);
+        ensure(isset($j["require"]["wp-theme/twentytwentyfive"]));
       } else {
-        assert($c["policies"]["rest_api"]["enabled"]===true);
-        assert(in_array("$s-api",$c["plugins"]["active"],true));
+        ensure($c["policies"]["rest_api"]["enabled"]===true);
+        ensure(in_array("$s-api",$c["plugins"]["active"],true));
       }
     ' "$dest/config/wordpress.php" "$dest/composer.json" "$mode" "$slug"
   elif command -v docker >/dev/null 2>&1; then

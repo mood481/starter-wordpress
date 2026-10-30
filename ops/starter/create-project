@@ -18,7 +18,7 @@ done
 [[ "$mode" == headless || "$mode" == standard ]] || die "Invalid mode"
 [[ "$layout" == standalone || "$layout" == monorepo ]] || die "Invalid layout"
 [[ "$slug" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]] || die "Invalid slug"
-[[ -n "$name" && "$name" != *$'\n'* && "$name" != *$'\r'* && "$name" != *"'"* && "$name" != *'\\'* ]] || die "Invalid name"
+[[ "$name" =~ ^[a-zA-Z0-9][a-zA-Z0-9._\ \&-]*$ ]] || die "Invalid project name (letters, digits, spaces, . _ & - only)"
 [[ -n "$target" && "$target" != / && ! -L "$target" ]] || die "Invalid target"
 if [[ -e "$target" ]]; then
   [[ -d "$target" && -z "$(ls -A "$target")" ]] || die "Target must be empty"

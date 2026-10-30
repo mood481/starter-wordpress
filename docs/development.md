@@ -80,45 +80,9 @@ ops/starter/
 
 They are distinct from `ops/local/`, which contains wrappers for operational tools executed from a local workstation.
 
-### Optional child theme bootstrap
+### Project generation
 
-The starter itself uses the Gear Headless theme directly and does not contain a generated child theme.
-
-A project can optionally create its own child theme with:
-
-```bash
-./ops/starter/bootstrap-theme <slug> "<name>"
-```
-
-Example:
-
-```bash
-./ops/starter/bootstrap-theme llif "Llif"
-```
-
-The command:
-
-1. validates the project theme slug;
-2. requires the starter to still use `twentytwentyfive` as parent and active theme;
-3. creates `src/themes/<slug>/style.css`;
-4. creates `src/themes/<slug>/theme.json`;
-5. changes `theme.active` in `config/wordpress.php` to the generated project theme.
-
-It does not run Composer, connect to WordPress, modify the database or deploy anything.
-
-It is intentionally one-shot and refuses to overwrite an existing theme or an already customized active-theme declaration.
-
-### Bootstrap self-test
-
-The operation contains its own optional self-test:
-
-```bash
-./ops/starter/bootstrap-theme --test
-```
-
-The self-test creates a temporary minimal starter workspace, runs the bootstrap there, validates the generated files and state change, verifies that a second bootstrap is rejected, and removes the temporary workspace.
-
-It never modifies the actual repository and is not part of the normal CI release pipeline.
+The generator at `ops/starter/create-project` composes common files and complete profile templates. `ops/starter/templates/` holds the declarative configurations and theme/API code; `ops/starter/manifests/` lists reusable paths. `ops/starter/tests/create-project.sh` validates four combinations. Twenty Twenty-Five and the child theme are selected together in the standard profile; no separate theme bootstrap is required.
 
 ## Desired WordPress state
 
@@ -134,16 +98,7 @@ return [
 ];
 ```
 
-After an optional project theme bootstrap, only the active theme changes:
-
-```php
-'theme' => [
-    'parent' => 'twentytwentyfive',
-    'active' => '<project-theme>',
-],
-```
-
-`plugins` is reserved for the plugin baseline.
+In a standard consumer, `theme.parent = twentytwentyfive` and `theme.active = <slug>`. In headless, both are `gear-headless`. Plugins are explicitly declared for each profile.
 
 ## Build and validation
 
@@ -188,19 +143,7 @@ Starts an isolated Docker runtime with WordPress and MariaDB and performs a real
 
 Smoke reads the expected parent and active theme from `config/wordpress.php`, verifies that both are installed, activates the configured theme, verifies the resulting `template` and `stylesheet` WordPress options, and checks the WordPress login page over HTTP.
 
-This works unchanged in both states:
-
-```text
-starter
-  parent = twentytwentyfive
-  active = twentytwentyfive
-
-project with child theme
-  parent = twentytwentyfive
-  active = <project-theme>
-```
-
-The database and uploads volume are disposable and removed at the end of the smoke test.
+The smoke test checks the active theme declared in `config/wordpress.php`. The database and uploads volume are disposable and removed at the end of the smoke test.
 
 ### `ops/audit`
 

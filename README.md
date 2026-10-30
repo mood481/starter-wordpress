@@ -4,7 +4,9 @@ A reproducible WordPress starter for projects managed as buildable and deployabl
 
 The repository contains application source and configuration. WordPress core and third-party packages are dependencies; CI builds and validates a self-contained release artifact before deployment.
 
-The default profile is headless with a minimal project-owned theme and a versioned REST API extension. The same starter can generate **standard or headless**, **standalone or monorepo** consumers. See [Profiles and project generation](docs/headless.md).\n\n## Requirements
+The default profile is headless with a minimal project-owned theme and a versioned REST API extension. The same starter can generate **standard or headless**, **standalone or monorepo** consumers. See [Profiles and project generation](docs/headless.md).
+
+## Requirements
 
 Local maintenance requires:
 
@@ -12,6 +14,8 @@ Local maintenance requires:
 - Docker
 
 Local PHP, Composer and Deployer installations are not required.
+
+For new projects use `./ops/starter/create-project` with a profile and layout; `./ops/starter/tests/create-project.sh` checks the generated templates. CircleCI `verify` validates the generator and Gear build/test/smoke without publishing.
 
 ## Main commands
 
