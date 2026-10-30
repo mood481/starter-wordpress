@@ -29,7 +29,7 @@ Site: `http://127.0.0.1:8080`.
 Admin: `http://127.0.0.1:8080/wp/wp-admin/`.
 
 Change `SERVE_PORT` in `.env.serve.local` to use another local HTTP port.
-Use `./ops/serve stop` to stop without deleting local data,
+Stop the local server before executing `./ops/smoke` on the same port.\nUse `./ops/serve stop` to stop without deleting local data,
 `./ops/serve logs` to inspect containers, or
 `./ops/serve reset` to delete the local database and uploads.
 

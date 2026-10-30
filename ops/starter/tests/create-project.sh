@@ -40,6 +40,10 @@ for mode in headless standard; do
     [[ ! -e "$dest/composer.lock" && ! -e "$dest/ops/starter" && ! -e "$dest/.buildkite" ]]
     # CI/CD is owned by the consumer, regardless of repository layout.
     [[ ! -e "$dest/.circleci" ]]
+    [[ -x "$dest/ops/serve" ]]
+    [[ -f "$dest/.env.composer.local" && -f "$dest/.env.serve.local" ]]
+    grep -Fq "Deployer" "$dest/README.md"
+    grep -Fq "./ops/serve start" "$dest/README.md"
     if [[ "$mode" == standard ]]; then
       [[ -f "$dest/src/themes/sample-project/style.css" ]]
       grep -Fq "Template: twentytwentyfive" "$dest/src/themes/sample-project/style.css"
