@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "83e903170143a6eaaa39767c47e14457",
+    "content-hash": "2c864fa1286bf2e0d0ad3c90a44e7ada",
     "packages": [
         {
             "name": "composer/installers",
@@ -216,19 +216,19 @@
         },
         {
             "name": "mood/wordpress-policies",
-            "version": "0.1.6",
+            "version": "0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://git.mood481.es/mood/wordpress-policies",
-                "reference": "0.1.6"
+                "reference": "0.2.0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://git.mood481.es/api/packages/mood/composer/files/mood%2Fwordpress-policies/0.1.6/mood-wordpress-policies.0.1.6.zip",
-                "shasum": "2f61f4a93e049cc677cb5049966350409dc5f9d8"
+                "url": "https://git.mood481.es/api/packages/mood/composer/files/mood%2Fwordpress-policies/0.2.0/mood-wordpress-policies.0.2.0.zip",
+                "shasum": "bc4b57e7bbdec7635f380e899beb9f9a204d3247"
             },
             "require": {
-                "php": "^8.3"
+                "php": "^8.4"
             },
             "require-dev": {
                 "phpunit/phpunit": "^12.5"
@@ -236,15 +236,15 @@
             "type": "wordpress-muplugin",
             "autoload-dev": {
                 "psr-4": {
-                    "Mood\\WordPress\\Policies\\Tests\\": "tests/",
-                    "Mood\\WordPress\\Policies\\": "src/"
+                    "Mood\\WordPress\\Policies\\": "src/",
+                    "Mood\\WordPress\\Policies\\Tests\\": "tests/"
                 }
             },
             "license": [
                 "proprietary"
             ],
             "description": "Code-driven WordPress security and exposure policies for Mood sites.",
-            "time": "2026-08-18T16:50:05+00:00"
+            "time": "2026-10-29T23:49:30+00:00"
         },
         {
             "name": "phpoption/phpoption",
