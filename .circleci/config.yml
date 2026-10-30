@@ -1,6 +1,6 @@
 version: 2.1
 
-# Verify only: no package publishing or deployment.
+# Build, tests and real consumer integration. No publication or deployment.
 jobs:
   build-and-test:
     machine:
@@ -14,7 +14,7 @@ jobs:
             docker compose version
       - run:
           name: Validate four starter profiles
-          command: ./ops/starter/tests/create-project.sh
+          command: bash ./ops/starter/tests/create-project.sh
       - run:
           name: Build WordPress
           command: ./ops/build
@@ -25,7 +25,24 @@ jobs:
           name: Integration smoke
           command: ./ops/smoke
 
+  consumer-integration:
+    parameters:
+      profile:
+        type: enum
+        enum: ["headless", "standard"]
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: Generate, resolve, build and smoke << parameters.profile >> consumer
+          command: bash ./ops/starter/tests/consume-project.sh << parameters.profile >>
+
 workflows:
   verify:
     jobs:
       - build-and-test
+      - consumer-integration:
+          matrix:
+            parameters:
+              profile: ["headless", "standard"]
