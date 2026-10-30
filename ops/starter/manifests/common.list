@@ -12,6 +12,7 @@ ops/docker
 ops/local
 ops/package
 ops/smoke
+ops/serve
 ops/test
 renovate.json
 src/mu-plugins/mood-wordpress-policies.php
