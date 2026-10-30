@@ -41,3 +41,27 @@ the generator tests use PHP 8.4 or Docker:
 The infrastructure plugin provides `GET /wp-json/gear/v1/health` and the
 `gear_headless_register_routes` hook. A consumer owns its routes and models.
 A reverse proxy or CDN for a separate public API domain is a deployment concern.
+
+
+## Real consumer integration in CircleCI
+
+The `verify` workflow has two independent consumer-integration jobs
+(`headless` and `standard`), in addition to the Gear starter build/test/smoke.
+Each job generates a new standalone project in a temporary directory,
+resolves its own `composer.lock` from the Gitea Composer registry, then runs
+`./ops/build`, `./ops/test` and `./ops/smoke` with Docker.
+
+Headless consumer smoke verifies the generated GET endpoint and rejects
+anonymous POST and an unlisted REST endpoint. Standard consumer smoke
+verifies its Twenty Twenty-Five parent/child theme and native anonymous
+WordPress REST behavior. Docker Compose uses a disposable MariaDB database
+and removes it at the end; no remote WordPress site is touched.
+
+CircleCI needs `COMPOSER_AUTH` with read access to `git.mood481.es`.
+No local PHP is needed. To run a consumer integration locally on a machine
+with Docker:
+
+```sh
+bash ./ops/starter/tests/consume-project.sh headless
+bash ./ops/starter/tests/consume-project.sh standard
+```
