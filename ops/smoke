@@ -304,4 +304,52 @@ if [[ "$HEADLESS_MODE" == "headless" ]]; then
 '
 fi
 
+echo "==> Checking profile-specific HTTP behavior"
+if [[ "$HEADLESS_MODE" == "headless" ]]; then
+    # The project-specific test route is optional for the Gear starter itself.
+    if [[ -n "${SMOKE_PROJECT_ROUTE:-}" ]]; then
+        "${COMPOSE[@]}" exec -T app php -r '
+            $route = $argv[1];
+            $base = "http://127.0.0.1/?rest_route=";
+            $get = @file_get_contents($base . rawurlencode($route));
+            $body = $get === false ? null : json_decode($get, true);
+            if (!is_array($body) || ($body["example"] ?? null) !== true) {
+                fwrite(STDERR, "Project API GET failed.\n");
+                exit(1);
+            }
+            $options = ["http" => [
+                "method" => "POST",
+                "ignore_errors" => true,
+            ]];
+            $context = stream_context_create($options);
+            $post = @file_get_contents($base . rawurlencode($route), false, $context);
+            $json = $post === false ? null : json_decode($post, true);
+            if (($json["code"] ?? null) !== "mood_rest_api_authentication_required") {
+                fwrite(STDERR, "Anonymous POST was not rejected by policies.\n");
+                exit(1);
+            }
+            $denied = @file_get_contents(
+                $base . rawurlencode("/wp/v2/users"), false,
+                stream_context_create(["http" => ["ignore_errors" => true]])
+            );
+            $json = $denied === false ? null : json_decode($denied, true);
+            if (($json["code"] ?? null) !== "mood_rest_api_authentication_required") {
+                fwrite(STDERR, "Unlisted anonymous REST route was not rejected.\n");
+                exit(1);
+            }
+        ' "$SMOKE_PROJECT_ROUTE"
+    fi
+else
+    "${COMPOSE[@]}" exec -T app php -r '
+        $body = @file_get_contents(
+            "http://127.0.0.1/?rest_route=%2Fwp%2Fv2%2Ftypes"
+        );
+        $data = $body === false ? null : json_decode($body, true);
+        if (!is_array($data) || !isset($data["post"])) {
+            fwrite(STDERR, "Standard WordPress anonymous REST behavior failed.\n");
+            exit(1);
+        }
+    '
+fi
+
 echo "==> Smoke test passed"
