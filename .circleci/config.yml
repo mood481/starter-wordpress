@@ -44,11 +44,11 @@ workflows:
       - build-and-test:
           filters:
             branches:
-              ignore: /^task\\/.*/
+              ignore: /^task\/.*/
       - consumer-integration:
           matrix:
             parameters:
               profile: ["headless", "standard"]
           filters:
             branches:
-              ignore: /^task\\/.*/
+              ignore: /^task\/.*/
