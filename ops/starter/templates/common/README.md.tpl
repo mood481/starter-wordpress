@@ -9,8 +9,11 @@ be installed on the host; the provided wrappers run them in containers.
 
 ## First local setup
 
-The generator creates `.env.composer.local` (empty credentials) and
-`.env.serve.local` (local port). Both are ignored by Git. Fill in
+The generator copies the examples from `docs/env.examples/` into
+`.env.composer.local` (empty credentials) and `.env.serve.local`
+(local development settings). Both root files are ignored by Git. The
+`serve` command exists only in a materialized consumer project, not in the
+starter's own `ops/` operations. Fill in
 `GITEA_PACKAGE_USER` and `GITEA_PACKAGE_TOKEN` in
 `.env.composer.local` with a **read-only** Gitea Packages token, or use
 the `COMPOSER_AUTH` environment variable instead. Never commit credentials.
@@ -29,7 +32,8 @@ Site: `http://127.0.0.1:8080`.
 Admin: `http://127.0.0.1:8080/wp/wp-admin/`.
 
 Change `SERVE_PORT` in `.env.serve.local` to use another local HTTP port.
-Stop the local server before executing `./ops/smoke` on the same port.\nUse `./ops/serve stop` to stop without deleting local data,
+Stop the local server before executing `./ops/smoke` on the same port.
+Use `./ops/serve stop` to stop without deleting local data,
 `./ops/serve logs` to inspect containers, or
 `./ops/serve reset` to delete the local database and uploads.
 

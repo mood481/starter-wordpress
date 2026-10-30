@@ -69,6 +69,8 @@ render() {
       line="${line//__LAYOUT__/$layout}"
       printf '%s\n' "$line"
     done < "$file" > "$DEST/$path"
+    # Retain executable-bit metadata from templates for consumer-only scripts.
+    if [[ -x "$file" ]]; then chmod +x "$DEST/$path"; fi
   done < <(find "$ROOT/ops/starter/templates/$1" -type f -print0)
 }
 copy_list common
@@ -79,10 +81,7 @@ render "$mode"
 # Local secrets remain empty and ignored by Git. Prefer COMPOSER_AUTH when
 # the caller already has authenticated CI environment variables.
 cp "$ROOT/docs/env.examples/env.composer.example" "$DEST/.env.composer.local"
-cat > "$DEST/.env.serve.local" <<'LOCAL_ENV'
-# Local WordPress service, not suitable for production.
-SERVE_PORT=8080
-LOCAL_ENV
+cp "$ROOT/docs/env.examples/env.serve.example" "$DEST/.env.serve.local"
 
 [[ ! -e "$DEST/composer.lock" ]] || die "Lock copied unexpectedly"
 if grep -R -E '__SLUG__|__PROJECT_NAME__|__LAYOUT__' "$DEST/README.md" "$DEST/PROJECT.md" "$DEST/config/wordpress.php" "$DEST/composer.json" "$DEST/src"; then

@@ -13,6 +13,8 @@ The WordPress themes and generated consumer projects have independent versions.
 - PHP 8.4 and WordPress application baselines with `mood/wordpress-policies` 0.2.
 - CircleCI verification of both generated consumer profiles with disposable
   WordPress and MariaDB installations.
+- Persistent local WordPress development server generated for consumers
+  (`ops/serve`), with a reusable `env.serve.example`.
 - Consumer artifact validation: `ops/package` archive, SHA-256 checksum,
   extracted release structure and Deployer task loading for both target adapters.
 

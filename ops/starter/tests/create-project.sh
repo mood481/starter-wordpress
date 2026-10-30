@@ -41,7 +41,11 @@ for mode in headless standard; do
     # CI/CD is owned by the consumer, regardless of repository layout.
     [[ ! -e "$dest/.circleci" ]]
     [[ -x "$dest/ops/serve" ]]
+    [[ ! -e "$ROOT/ops/serve" ]]
+    bash -n "$dest/ops/serve"
     [[ -f "$dest/.env.composer.local" && -f "$dest/.env.serve.local" ]]
+    [[ -f "$dest/docs/env.examples/env.serve.example" ]]
+    cmp -s "$dest/docs/env.examples/env.serve.example" "$dest/.env.serve.local"
     grep -Fq "Deployer" "$dest/README.md"
     grep -Fq "./ops/serve start" "$dest/README.md"
     if [[ "$mode" == standard ]]; then
