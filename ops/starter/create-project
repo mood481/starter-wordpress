@@ -1,7 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
-mode="" layout="" slug="" name="" target=""
+usage() {
+  cat <<'HELP'
+Usage: ./ops/starter/create-project --slug SLUG --name NAME --target DIRECTORY [options]
+
+Options:
+  --mode headless|standard       WordPress profile (default: headless)
+  --layout standalone|monorepo  Project layout (default: standalone)
+  --slug SLUG                   Lowercase letters, digits and hyphens
+  --name NAME                   Human-readable project name
+  --target DIRECTORY            New or empty destination outside the starter
+  -h, --help                    Show this help
+
+The generator creates source and local configuration placeholders. No PHP,
+Composer, database or credentials are required until the project is set up.
+HELP
+}
+mode="headless" layout="standalone" slug="" name="" target=""
 die() { echo "create-project: $*" >&2; exit 1; }
 while (( $# )); do
   case "$1" in
@@ -12,20 +28,23 @@ while (( $# )); do
         --name) name="$2";; --target) target="$2";;
       esac
       shift 2;;
-    *) die "Unknown argument $1";;
+    -h|--help) usage; exit 0;;
+    *) die "Unknown option '$1'. Run --help for usage.";;
   esac
 done
-[[ "$mode" == headless || "$mode" == standard ]] || die "Invalid mode"
-[[ "$layout" == standalone || "$layout" == monorepo ]] || die "Invalid layout"
-[[ "$slug" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]] || die "Invalid slug"
+[[ "$mode" == headless || "$mode" == standard ]] || die "--mode must be headless or standard (got: $mode)"
+[[ "$layout" == standalone || "$layout" == monorepo ]] || die "--layout must be standalone or monorepo (got: $layout)"
+[[ -n "$slug" ]] || die "--slug is required. Run --help for usage."
+[[ "$slug" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]] || die "--slug must start with a lowercase letter and contain only lowercase letters, digits and hyphens"
 [[ "$name" =~ ^[a-zA-Z0-9][a-zA-Z0-9._\ \&-]*$ ]] || die "Invalid project name (letters, digits, spaces, . _ & - only)"
-[[ -n "$target" && "$target" != / && ! -L "$target" ]] || die "Invalid target"
+[[ -n "$target" ]] || die "--target is required. Run --help for usage."
+[[ "$target" != / && ! -L "$target" ]] || die "--target must not be / or a symbolic link"
 if [[ -e "$target" ]]; then
-  [[ -d "$target" && -z "$(ls -A "$target")" ]] || die "Target must be empty"
+  [[ -d "$target" && -z "$(ls -A "$target")" ]] || die "--target already exists and is not an empty directory: $target"
 fi
 mkdir -p "$target"
 DEST="$(cd "$target" && pwd -P)"
-[[ "$DEST" != "$ROOT" && "$DEST" != "$ROOT/"* ]] || die "Destination inside starter"
+[[ "$DEST" != "$ROOT" && "$DEST" != "$ROOT/"* ]] || die "--target must be outside the starter source checkout"
 
 copy_list() {
   local item
@@ -56,6 +75,16 @@ copy_list common
 [[ "$mode" == headless ]] && copy_list headless
 render common
 render "$mode"
+
+# Local secrets remain empty and ignored by Git. Prefer COMPOSER_AUTH when
+# the caller already has authenticated CI environment variables.
+cp "$ROOT/docs/env.examples/env.composer.example" "$DEST/.env.composer.local"
+cat > "$DEST/.env.serve.local" <<'LOCAL_ENV'
+# Local WordPress service, not suitable for production.
+SERVE_PORT=8080
+SERVE_DB_PORT=3307
+LOCAL_ENV
+
 [[ ! -e "$DEST/composer.lock" ]] || die "Lock copied unexpectedly"
 if grep -R -E '__SLUG__|__PROJECT_NAME__|__LAYOUT__' "$DEST/README.md" "$DEST/PROJECT.md" "$DEST/config/wordpress.php" "$DEST/composer.json" "$DEST/src"; then
   die "Unresolved placeholders"
