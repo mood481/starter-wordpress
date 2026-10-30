@@ -1,0 +1,31 @@
+version: 2.1
+
+# Verify only: no package publishing or deployment.
+jobs:
+  build-and-test:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: Check Docker and Compose
+          command: |
+            docker version
+            docker compose version
+      - run:
+          name: Validate four starter profiles
+          command: ./ops/starter/tests/create-project.sh
+      - run:
+          name: Build WordPress
+          command: ./ops/build
+      - run:
+          name: Validate build
+          command: ./ops/test
+      - run:
+          name: Integration smoke
+          command: ./ops/smoke
+
+workflows:
+  verify:
+    jobs:
+      - build-and-test
