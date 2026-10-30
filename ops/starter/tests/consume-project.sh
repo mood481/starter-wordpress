@@ -19,7 +19,16 @@ command -v docker >/dev/null 2>&1 || {
 docker compose version >/dev/null
 
 # The generated project must be genuinely independent of the starter checkout.
-TEMP="$(mktemp -d)"
+# Docker Desktop on macOS may not share the system /private/var/folders path.
+# Keep the disposable consumer alongside the checkout, outside the source
+# tree (create-project deliberately rejects destinations inside the starter).
+TEMP_PARENT="${GEAR_TEST_TMPDIR:-$(dirname "$ROOT")}"
+[[ -d "$TEMP_PARENT" && -w "$TEMP_PARENT" ]] || {
+    echo "Test directory not writable: $TEMP_PARENT" >&2
+    echo "Set GEAR_TEST_TMPDIR to a Docker-shared writable directory." >&2
+    exit 1
+}
+TEMP="$(mktemp -d "$TEMP_PARENT/.gear-consumer-test.XXXXXX")"
 trap 'rm -rf "$TEMP"' EXIT
 PROJECT="$TEMP/project"
 SLUG="ci-$MODE"
@@ -38,6 +47,15 @@ echo "==> Generate a fresh $MODE consumer"
 }
 
 cd "$PROJECT"
+
+# Explicitly check Docker's view: bind mounts can appear empty when their
+# host path is outside Docker Desktop's shared directories.
+docker run --rm \
+    --volume "$PROJECT:/app:ro" \
+    --workdir /app \
+    --entrypoint sh \
+    "${COMPOSER_IMAGE:-composer:2.10.2}" \
+    -c 'test -f composer.json || { echo "Docker cannot see the generated composer.json at /app. Check Docker Desktop file sharing or GEAR_TEST_TMPDIR." >&2; exit 1; }'
 
 echo "==> Resolve an independent Composer lock (PHP 8.4, Gitea Packages)"
 ./ops/local/composer update \
