@@ -1,0 +1,17 @@
+.gitignore
+bootstrap
+config/application.php
+config/environments
+deploy
+docs/env.examples
+ops/audit
+ops/build
+ops/ci
+ops/deployer
+ops/docker
+ops/local
+ops/package
+ops/smoke
+ops/test
+renovate.json
+src/mu-plugins/mood-wordpress-policies.php

@@ -1,0 +1,63 @@
+{
+    "name": "mood/__SLUG__-wordpress",
+    "description": "__PROJECT_NAME__ WordPress application",
+    "type": "project",
+    "license": "proprietary",
+    "repositories": [
+        {
+            "name": "wp-packages",
+            "type": "composer",
+            "url": "https://repo.wp-packages.org",
+            "only": [
+                "wp-plugin/*",
+                "wp-theme/*"
+            ]
+        },
+        {
+            "name": "mood-wordpress-policies",
+            "type": "composer",
+            "url": "https://git.mood481.es/api/packages/mood/composer"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "composer/installers": "^2.0",
+        "mood/wordpress-policies": "^0.2",
+        "roots/wordpress": "~7.1.0",
+        "vlucas/phpdotenv": "^5.6.0",
+        "wp-plugin/secure-passkeys": "^1.3",
+        "wp-theme/twentytwentyfive": "^1.0"
+    },
+    "config": {
+        "vendor-dir": "build/vendor",
+        "allow-plugins": {
+            "composer/installers": true,
+            "roots/wordpress-core-installer": true
+        },
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.0"
+        },
+        "policy": {
+            "abandoned": {
+                "audit": "report"
+            }
+        }
+    },
+    "extra": {
+        "wordpress-install-dir": "build/public/wp",
+        "installer-paths": {
+            "build/public/wp-content/mu-plugins/{$name}/": [
+                "type:wordpress-muplugin"
+            ],
+            "build/public/wp-content/plugins/{$name}/": [
+                "type:wordpress-plugin"
+            ],
+            "build/public/wp-content/themes/{$name}/": [
+                "type:wordpress-theme"
+            ]
+        }
+    }
+}

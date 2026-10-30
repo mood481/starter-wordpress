@@ -1,188 +1,64 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-
-usage() {
-    cat <<'EOF'
-Usage:
-  ./ops/starter/create-project --mode headless|standard --layout standalone|monorepo \
-      --slug <slug> --name "<name>" --target <directory>
-  ./ops/starter/create-project --test
-
-Generates a copy of WordPress Gear without local PHP or Composer.
-Monorepo mode leaves root build, CI and package-manager configuration untouched.
-EOF
-}
-
-die() { echo "Error: $*" >&2; exit 1; }
-
-generate() {
-    local mode="$1" layout="$2" slug="$3" name="$4" target="$5"
-    [[ "$mode" == "headless" || "$mode" == "standard" ]] || die "Invalid mode"
-    [[ "$layout" == "standalone" || "$layout" == "monorepo" ]] || die "Invalid layout"
-    [[ "$slug" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]] || die "Invalid slug"
-    [[ -n "$name" && "$name" != *$'\n'* ]] || die "Invalid project name"
-    [[ -n "$target" && "$target" != "/" ]] || die "Invalid target"
-    if [[ -e "$target" ]]; then
-        [[ -d "$target" ]] || die "Target is not a directory"
-        [[ -z "$(ls -A "$target")" ]] || die "Target is not empty"
-    fi
-    mkdir -p "$target"
-    local dest
-    dest="$(cd "$target" && pwd -P)"
-    [[ "$dest" != "$ROOT" && "$dest" != "$ROOT/"* ]] || die "Target must be outside the starter checkout"
-
-    tar -C "$ROOT" \
-        --exclude='./.git' --exclude='./build' --exclude='./dist' \
-        --exclude='./vendor' --exclude='./.env' \
-        --exclude='./.env.*.local' --exclude='./.env.composer.local' \
-        --exclude='./.env.renovate.local' --exclude='./.env.runtime.local' \
-        --exclude='./.env.install.local' \
-        -cf - . | tar -C "$dest" -xf -
-
-    # New consumers must resolve their own lock after selecting dependencies.
-    rm -f "$dest/composer.lock"
-    if [[ "$layout" == "monorepo" ]]; then
-        rm -rf "$dest/.buildkite"
-    fi
-
-    # Reuse core starter templates; never patch a theme from the source checkout.
-    local config="$dest/config/wordpress.php"
-    if [[ "$mode" == "standard" ]]; then
-        mkdir -p "$dest/src/themes/$slug"
-        cat > "$dest/src/themes/$slug/style.css" <<EOF
-/*
-Theme Name: $name
-Version: 0.1.0
-Text Domain: $slug
-Requires PHP: 8.4
-*/
-EOF
-        cat > "$dest/src/themes/$slug/index.php" <<'EOF'
-<?php
-defined('ABSPATH') || exit;
-get_header();
-if (have_posts()) {
-    while (have_posts()) {
-        the_post();
-        the_title('<h1>', '</h1>');
-        the_content();
-    }
-}
-get_footer();
-EOF
-        cat > "$dest/src/themes/$slug/header.php" <<'EOF'
-<!doctype html>
-<html <?php language_attributes(); ?>>
-<head><meta charset="<?php bloginfo('charset'); ?>"><?php wp_head(); ?></head>
-<body <?php body_class(); ?>>
-EOF
-        cat > "$dest/src/themes/$slug/footer.php" <<'EOF'
-<?php wp_footer(); ?>
-</body></html>
-EOF
-        sed -i.bak \
-            -e "s/'mode' => 'headless'/'mode' => 'standard'/" \
-            -e "s/'parent' => 'gear-headless'/'parent' => '$slug'/" \
-            -e "s/'active' => 'gear-headless'/'active' => '$slug'/" \
-            -e "s/'secure-passkeys', 'gear-headless-api'/'secure-passkeys'/" \
-            -e "s/'rest_api' => \\[/'rest_api' => ['enabled' => false,/" \
-            "$config"
-    else
-        local plugin="$dest/src/plugins/$slug-api"
-        mkdir -p "$plugin"
-        cat > "$plugin/$slug-api.php" <<EOF
-<?php
-/**
- * Plugin Name: $name API
- * Description: Project-owned endpoints and models.
- * Version: 0.1.0
- */
-declare(strict_types=1);
-defined('ABSPATH') || exit;
-
-add_action('gear_headless_register_routes', static function (): void {
-    register_rest_route('$slug/v1', '/example', [
-        'methods' => WP_REST_Server::READABLE,
-        'permission_callback' => '__return_true',
-        'callback' => static fn (): array => ['example' => true],
-    ]);
-});
-EOF
-        sed -i.bak \
-            -e "s/'secure-passkeys', 'gear-headless-api'/'secure-passkeys', 'gear-headless-api', '$slug-api'/" \
-            -e "s@'/gear/v1/health'@'/gear/v1/health', '/$slug/v1/example'@" \
-            "$config"
-    fi
-
-    # The package name is project-owned and MUST be unique for each consumer.
-    sed -i.bak \
-        "s@\"name\": \"mood/starter-wordpress-gear\"@\"name\": \"mood/$slug-wordpress\"@" \
-        "$dest/composer.json"
-    rm -f "$config.bak" "$dest/composer.json.bak"
-
-    cat > "$dest/PROJECT.md" <<EOF
-# $name
-
-Generated from WordPress Gear.
-
-- Profile: $mode
-- Layout: $layout
-- Package: mood/$slug-wordpress
-
-Run commands from this project directory (also inside a monorepo):
-
-\`\`\`sh
-./ops/local/composer update --with-all-dependencies
-./ops/build
-./ops/test
-./ops/smoke
-\`\`\`
-
-Commit the resolved composer.lock. Configure the private Composer registry
-before resolving dependencies. No local PHP/Composer binary is necessary.
-EOF
-    echo "Created $mode WordPress Gear project at $dest ($layout)"
-}
-
-self_test() {
-    local temp
-    temp="$(mktemp -d)"
-    trap 'rm -rf "$temp"' EXIT
-    generate headless standalone example "Example" "$temp/headless"
-    generate standard monorepo classic "Classic" "$temp/mono/apps/classic"
-    grep -Fq "'mode' => 'headless'" "$temp/headless/config/wordpress.php"
-    grep -Fq "'mode' => 'standard'" "$temp/mono/apps/classic/config/wordpress.php"
-    grep -Fq "'example-api'" "$temp/headless/config/wordpress.php"
-    grep -Fq "'classic'" "$temp/mono/apps/classic/config/wordpress.php"
-    [[ -f "$temp/headless/src/plugins/example-api/example-api.php" ]]
-    [[ -f "$temp/mono/apps/classic/src/themes/classic/style.css" ]]
-    [[ ! -e "$temp/mono/apps/classic/.buildkite" ]]
-    [[ ! -e "$temp/headless/composer.lock" ]]
-    echo "Project generator self-test passed"
-}
-
-if [[ "${1:-}" == "--test" ]]; then
-    [[ $# -eq 1 ]] || die "Unexpected arguments"
-    self_test
-    exit 0
-fi
-
+ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 mode="" layout="" slug="" name="" target=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --mode|--layout|--slug|--name|--target)
-            [[ $# -ge 2 ]] || die "Missing value for $1"
-            case "$1" in
-                --mode) mode="$2";; --layout) layout="$2";;
-                --slug) slug="$2";; --name) name="$2";;
-                --target) target="$2";;
-            esac
-            shift 2;;
-        -h|--help) usage; exit 0;;
-        *) die "Unknown argument: $1";;
-    esac
+die() { echo "create-project: $*" >&2; exit 1; }
+while (( $# )); do
+  case "$1" in
+    --mode|--layout|--slug|--name|--target)
+      (( $# >= 2 )) || die "Missing value for $1"
+      case "$1" in
+        --mode) mode="$2";; --layout) layout="$2";; --slug) slug="$2";;
+        --name) name="$2";; --target) target="$2";;
+      esac
+      shift 2;;
+    *) die "Unknown argument $1";;
+  esac
 done
-[[ -n "$mode" && -n "$layout" && -n "$slug" && -n "$name" && -n "$target" ]] || { usage >&2; exit 2; }
-generate "$mode" "$layout" "$slug" "$name" "$target"
+[[ "$mode" == headless || "$mode" == standard ]] || die "Invalid mode"
+[[ "$layout" == standalone || "$layout" == monorepo ]] || die "Invalid layout"
+[[ "$slug" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]] || die "Invalid slug"
+[[ -n "$name" && "$name" != *$'\n'* && "$name" != *$'\r'* && "$name" != *"'"* && "$name" != *'\\'* ]] || die "Invalid name"
+[[ -n "$target" && "$target" != / && ! -L "$target" ]] || die "Invalid target"
+if [[ -e "$target" ]]; then
+  [[ -d "$target" && -z "$(ls -A "$target")" ]] || die "Target must be empty"
+fi
+mkdir -p "$target"
+DEST="$(cd "$target" && pwd -P)"
+[[ "$DEST" != "$ROOT" && "$DEST" != "$ROOT/"* ]] || die "Destination inside starter"
+
+copy_list() {
+  local item
+  while IFS= read -r item || [[ -n "$item" ]]; do
+    [[ -z "$item" || "$item" == \#* ]] && continue
+    [[ -e "$ROOT/$item" ]] || die "Missing source $item"
+    mkdir -p "$DEST/$(dirname "$item")"
+    cp -R "$ROOT/$item" "$DEST/$item"
+  done < "$ROOT/ops/starter/manifests/$1.list"
+}
+render() {
+  local file path line
+  while IFS= read -r -d '' file; do
+    path="${file#"$ROOT/ops/starter/templates/$1/"}"
+    path="${path%.tpl}"
+    path="${path//__SLUG__/$slug}"
+    [[ ! -e "$DEST/$path" ]] || die "Template collision $path"
+    mkdir -p "$DEST/$(dirname "$path")"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      line="${line//__SLUG__/$slug}"
+      line="${line//__PROJECT_NAME__/$name}"
+      line="${line//__LAYOUT__/$layout}"
+      printf '%s\n' "$line"
+    done < "$file" > "$DEST/$path"
+  done < <(find "$ROOT/ops/starter/templates/$1" -type f -print0)
+}
+copy_list common
+[[ "$mode" == headless ]] && copy_list headless
+[[ "$layout" == standalone ]] && copy_list standalone
+render common
+render "$mode"
+[[ ! -e "$DEST/composer.lock" ]] || die "Lock copied unexpectedly"
+if grep -R -E '__SLUG__|__PROJECT_NAME__|__LAYOUT__' "$DEST/README.md" "$DEST/PROJECT.md" "$DEST/config/wordpress.php" "$DEST/composer.json" "$DEST/src"; then
+  die "Unresolved placeholders"
+fi
+echo "Created $mode/$layout project at $DEST"
