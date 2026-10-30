@@ -38,11 +38,8 @@ for mode in headless standard; do
     "$ROOT/ops/starter/create-project" --mode "$mode" --layout "$layout" --slug sample-project --name "Sample Project" --target "$dest"
     [[ -x "$dest/ops/build" && -f "$dest/config/wordpress.php" && -f "$dest/PROJECT.md" ]]
     [[ ! -e "$dest/composer.lock" && ! -e "$dest/ops/starter" && ! -e "$dest/.buildkite" ]]
-    if [[ "$layout" == standalone ]]; then
-      [[ -f "$dest/.circleci/config.yml" ]]
-    else
-      [[ ! -e "$dest/.circleci" ]]
-    fi
+    # CI/CD is owned by the consumer, regardless of repository layout.
+    [[ ! -e "$dest/.circleci" ]]
     if [[ "$mode" == standard ]]; then
       [[ -f "$dest/src/themes/sample-project/style.css" ]]
       grep -Fq "Template: twentytwentyfive" "$dest/src/themes/sample-project/style.css"

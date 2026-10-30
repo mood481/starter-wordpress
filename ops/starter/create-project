@@ -54,7 +54,6 @@ render() {
 }
 copy_list common
 [[ "$mode" == headless ]] && copy_list headless
-[[ "$layout" == standalone ]] && copy_list standalone
 render common
 render "$mode"
 [[ ! -e "$DEST/composer.lock" ]] || die "Lock copied unexpectedly"

@@ -1,6 +1,6 @@
 version: 2.1
 
-# Build, tests and real consumer integration. No publication or deployment.
+# Build, tests, packaging and Deployer contract checks. No publication or deployment.
 jobs:
   build-and-test:
     machine:
@@ -41,8 +41,14 @@ jobs:
 workflows:
   verify:
     jobs:
-      - build-and-test
+      - build-and-test:
+          filters:
+            branches:
+              ignore: /^task\\/.*/
       - consumer-integration:
           matrix:
             parameters:
               profile: ["headless", "standard"]
+          filters:
+            branches:
+              ignore: /^task\\/.*/
