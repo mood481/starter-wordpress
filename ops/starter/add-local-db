@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+target=""
+usage() {
+  echo "Usage: ./ops/starter/add-local-db --target PROJECT_DIR"
+  echo "Installs the optional local database import/export tool in a generated project."
+}
+while (($#)); do
+  case "$1" in
+    --target) (($#>=2)) || { usage >&2; exit 2; }; target="$2"; shift 2;;
+    -h|--help) usage; exit 0;;
+    *) usage >&2; exit 2;;
+  esac
+done
+[[ -n "$target" && -d "$target" ]] || { usage >&2; exit 2; }
+dest="$(cd "$target" && pwd -P)"
+[[ "$dest" != "$ROOT" && "$dest" != "$ROOT/"* ]] || { echo "Target must be a consumer outside the starter." >&2; exit 1; }
+[[ -f "$dest/composer.json" && -f "$dest/ops/serve" && -f "$dest/ops/docker/smoke.compose.yml" ]] || { echo "Target is not a generated consumer with serve support." >&2; exit 1; }
+[[ ! -e "$dest/ops/local-db" ]] || { echo "ops/local-db already exists; refusing to overwrite." >&2; exit 1; }
+cp "$ROOT/ops/starter/templates/optional/ops/local-db.tpl" "$dest/ops/local-db"
+chmod +x "$dest/ops/local-db"
+echo "Installed optional ops/local-db in $dest"

@@ -85,6 +85,23 @@ A CI system may run the same operations and provide credentials via its
 secret store. A monorepo can orchestrate them from its root; this project
 does not ship a CI pipeline.
 
+## Optional local database import/export
+
+The starter also provides an optional `ops/local-db` tool that is **not
+included by default**. Install it into an already materialized consumer from
+the starter checkout:
+
+```sh
+./ops/starter/add-local-db --target ../your-wordpress-project
+```
+
+The consumer can then run `./ops/local-db export --output backup.sql` or
+`./ops/local-db import --file source.sql --from-url https://original.example --yes`.
+Import affects **only the local Docker database** and creates a backup before
+modifying it. An SQL copy can include user accounts and personal information:
+obtain permission, sanitize where appropriate, and never commit dumps.
+Uploads/media are not imported. Neither command connects to a remote DB.
+
 ## Project structure
 
 - `src/plugins/`, `src/themes/`, `src/mu-plugins/`: project-owned WordPress code.
