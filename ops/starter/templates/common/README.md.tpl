@@ -39,7 +39,10 @@ Use `./ops/serve stop` to stop without deleting local data,
 
 **Do not use the local development credentials or configuration in production.**
 The local service is for development; `./ops/smoke` is an independent,
-disposable test environment.
+disposable test environment. On every start, the application reconciles
+`config/wordpress.php` theme and active/inactive plugins. Even in development,
+plugin/theme installation and updates from wp-admin stay disabled
+(`DISALLOW_FILE_MODS`); manage code through Composer or `src/`.
 
 ## Build, test and package
 

@@ -8,6 +8,5 @@ return [
     'SCRIPT_DEBUG' => true,
     'WP_DISABLE_FATAL_ERROR_HANDLER' => true,
 
-    // Development environments are intentionally mutable.
-    'DISALLOW_FILE_MODS' => false,
+    // Plugin/theme files stay managed by source + Composer in every environment.
 ];

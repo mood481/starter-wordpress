@@ -72,18 +72,68 @@ if ! "${COMPOSE[@]}" run -T --rm cli core is-installed --path=/var/www/public/wp
   echo "Local-only admin credentials: admin / local-wordpress-change-me"
 fi
 
-state="$( "${COMPOSE[@]}" exec -T app php -r '
-  $c = require "/var/www/config/wordpress.php";
-  echo $c["theme"]["active"], PHP_EOL;
-  foreach ($c["plugins"]["active"] ?? [] as $plugin) echo $plugin, PHP_EOL;
+# Read the entire declarative state in one process. The tab-delimited format
+# avoids confusing the first plugin with the remaining lines.
+state="$("${COMPOSE[@]}" exec -T app php -r '
+  $config = require "/var/www/config/wordpress.php";
+  $theme = $config["theme"]["active"] ?? "";
+  if (!is_string($theme) || $theme === "") {
+    fwrite(STDERR, "Missing theme.active in config/wordpress.php\n");
+    exit(1);
+  }
+  echo "theme\t", $theme, PHP_EOL;
+  foreach (["active" => "activate", "inactive" => "deactivate"] as $key => $action) {
+    foreach ($config["plugins"][$key] ?? [] as $plugin) {
+      if (!is_string($plugin) || $plugin === "") {
+        fwrite(STDERR, "Invalid plugins.$key entry\n");
+        exit(1);
+      }
+      echo $action, "\t", $plugin, PHP_EOL;
+    }
+  }
 ')"
-theme="${state%%$'\n'*}"
-[[ -n "$theme" ]] || { echo "Missing active theme in config/wordpress.php" >&2; exit 1; }
-"${COMPOSE[@]}" run -T --rm cli theme activate "$theme" --path=/var/www/public/wp
-while IFS= read -r plugin; do
-  [[ -n "$plugin" ]] || continue
-  "${COMPOSE[@]}" run -T --rm cli plugin activate "$plugin" --path=/var/www/public/wp
-done <<< "${state#*$'\n'}"
+
+echo "==> Reconciling WordPress theme and plugins"
+while IFS=$'\t' read -r operation name; do
+  [[ -n "$operation" ]] || continue
+  case "$operation" in
+    theme)
+      "${COMPOSE[@]}" run -T --rm cli theme is-installed "$name" --path=/var/www/public/wp
+      current="$("${COMPOSE[@]}" run -T --rm cli option get stylesheet --path=/var/www/public/wp)"
+      if [[ "$current" != "$name" ]]; then
+        "${COMPOSE[@]}" run -T --rm cli theme activate "$name" --path=/var/www/public/wp
+      fi
+      actual="$("${COMPOSE[@]}" run -T --rm cli option get stylesheet --path=/var/www/public/wp)"
+      [[ "$actual" == "$name" ]] || { echo "Theme activation failed: $name" >&2; exit 1; }
+      ;;
+    activate)
+      "${COMPOSE[@]}" run -T --rm cli plugin is-installed "$name" --path=/var/www/public/wp
+      if ! "${COMPOSE[@]}" run -T --rm cli plugin is-active "$name" --path=/var/www/public/wp >/dev/null 2>&1; then
+        echo "==> Activating plugin: $name"
+        "${COMPOSE[@]}" run -T --rm cli plugin activate "$name" --path=/var/www/public/wp
+      fi
+      if ! "${COMPOSE[@]}" run -T --rm cli plugin is-active "$name" --path=/var/www/public/wp >/dev/null 2>&1; then
+        echo "Expected plugin to be active: $name" >&2
+        exit 1
+      fi
+      echo "Active plugin: $name"
+      ;;
+    deactivate)
+      "${COMPOSE[@]}" run -T --rm cli plugin is-installed "$name" --path=/var/www/public/wp
+      if "${COMPOSE[@]}" run -T --rm cli plugin is-active "$name" --path=/var/www/public/wp >/dev/null 2>&1; then
+        echo "==> Deactivating plugin: $name"
+        "${COMPOSE[@]}" run -T --rm cli plugin deactivate "$name" --path=/var/www/public/wp
+      fi
+      if "${COMPOSE[@]}" run -T --rm cli plugin is-active "$name" --path=/var/www/public/wp >/dev/null 2>&1; then
+        echo "Expected plugin to be inactive: $name" >&2
+        exit 1
+      fi
+      ;;
+    *)
+      echo "Unexpected state operation: $operation" >&2
+      exit 1;;
+  esac
+done <<< "$state"
 
 echo "WordPress: http://127.0.0.1:$SMOKE_PORT"
 echo "Admin:     http://127.0.0.1:$SMOKE_PORT/wp/wp-admin/"

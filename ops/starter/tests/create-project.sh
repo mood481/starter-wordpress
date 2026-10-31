@@ -49,7 +49,9 @@ for mode in headless standard; do
       echo "serve uses WP-CLI with an allocated TTY" >&2
       exit 1
     fi
-    [[ "$(grep -c 'run -T --rm cli' "$dest/ops/serve")" -eq 4 ]]
+    [[ "$(grep -c 'run -T --rm cli' "$dest/ops/serve")" -ge 4 ]]
+    grep -Fq 'Expected plugin to be active:' "$dest/ops/serve"
+    grep -Fq 'plugins"]["inactive"]' "$dest/ops/serve" || grep -Fq '"inactive"' "$dest/ops/serve"
     [[ -f "$dest/.env.composer.local" && -f "$dest/.env.serve.local" ]]
     [[ -f "$dest/docs/env.examples/env.serve.example" ]]
     cmp -s "$dest/docs/env.examples/env.serve.example" "$dest/.env.serve.local"

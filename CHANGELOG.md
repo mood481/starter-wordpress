@@ -18,6 +18,12 @@ The WordPress themes and generated consumer projects have independent versions.
 - Consumer artifact validation: `ops/package` archive, SHA-256 checksum,
   extracted release structure and Deployer task loading for both target adapters.
 
+### Fixed
+- Local `serve` reconciles and verifies declared active/inactive plugins and
+  only activates plugins when necessary.
+- Development now keeps WordPress plugin/theme filesystem modifications disabled,
+  consistently with the Composer-managed application model.
+
 ### Changed
 - Generated projects own their CI/CD configuration; neither profile copies
   the starter's CircleCI pipeline.
