@@ -18,3 +18,6 @@ tmp/
 *.tmp
 *.log
 
+
+# Local WordPress database snapshots (may contain personal data)
+.gear-local-backup-*.sql
